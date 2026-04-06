@@ -47,6 +47,15 @@ In a single ~5-hour session on a calendar consolidation feature spanning 7 ticke
 
 This is one session on one project. The pattern is reproducible.
 
+## Operational lessons folded into the protocol
+
+These patterns emerged from real sessions and are now baked into `BUILDER.md` / `REVIEWER.md` / the `agentchat.md` template:
+
+- **Heredoc append for chat writes.** `cat >> multicheck/agentchat.md <<'EOF' ... EOF` is byte-atomic at the kernel level (`O_APPEND` syscall) and never races with concurrent writers. Use this instead of `Edit` / `Write` tools, which hit "file modified since read" failures when anything else touches the file. The single quotes around `'EOF'` are required — they prevent shell expansion of `$`, backticks, and other metacharacters that appear in code references, commit hashes, and test output. In the reference session: ~10 heredoc writes, zero races; the prior 3 Edit/Write attempts all raced.
+- **Append-only, monotonic, no middle inserts.** Entries land at the end of the file with strictly increasing tag numbers. The reference session hit duplicate `S-023` and `S-025` tags after builder tooling inserted entries in the middle of the file, and humans grepping linearly got confused. Now a hard rule.
+- **Slice-purity verification for stacked PRs.** `git diff --name-only A..B` between every adjacent commit in the stack. Each diff should be exactly the files in that slice's intended scope. Any contamination blocks the PR. This verified a 5-commit chain (`#616 → #607 → #614 → #609 → #608`) in the reference session.
+- **Filesystem grep, not git ref grep, for uncommitted changes.** `git grep <pattern> <ref>` shows the committed state of a ref and lies about staged edits. Use `grep -rn` when verifying changes that aren't yet in a commit. The reference reviewer almost incorrectly accused the builder of false claims because of this exact distinction.
+
 ---
 
 ## How to use

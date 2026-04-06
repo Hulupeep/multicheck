@@ -74,6 +74,34 @@ DECISION: bypass-authorized | override | scope-change | dispute-resolution
 SCOPE: <what is and is not authorized>
 WHY:
 - <bullets>
+
+═══════════════════════════════════════════════════════════════════════════════
+File invariants
+═══════════════════════════════════════════════════════════════════════════════
+  - APPEND-ONLY to the END of this file. Never insert in the middle.
+  - Tags must be MONOTONICALLY INCREASING and UNIQUE. Never reuse a number.
+  - Reordering, renumbering, or middle-inserts break human readability and
+    create duplicate-tag confusion. This is a hard rule.
+
+═══════════════════════════════════════════════════════════════════════════════
+Canonical write pattern: heredoc append
+═══════════════════════════════════════════════════════════════════════════════
+
+  cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+  ### [S-NNN] HH:MM UTC — #ticket
+  STATE: ...
+  CLAIM: ...
+  ...
+  AGENTCHAT_EOF
+
+  - cat >> is byte-atomic (O_APPEND syscall). It cannot race with concurrent
+    writers. Use this instead of Edit/Write tools, which hit "file modified
+    since read" errors when anything else touches the file.
+  - <<'AGENTCHAT_EOF' with single quotes prevents shell expansion of $, backticks,
+    and other metacharacters that appear in code refs, commit hashes, test output,
+    and error messages.
+  - Edit/Write are a fallback only.
 -->
 
 # Agent Chat

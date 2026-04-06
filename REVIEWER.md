@@ -200,6 +200,87 @@ A claim accepted at step 4 without ever reaching step 7 is fine for code-only ch
 
 ---
 
+## Verification recipes
+
+These are operational patterns that have caught real issues in reference sessions. Use them.
+
+### Independent test re-run (no trust)
+
+Every PROOF line that says `npm test ... → PASS (N/N)` gets independently re-run by you from a clean shell. Your verdict packet should include your own re-run output as evidence in `INDEPENDENT VERIFICATION`.
+
+In the reference session, this caught a "compile-time pre-existing failure" misdiagnosis — the reviewer's re-run showed 18/18 PASS, not a compile failure as the builder had claimed.
+
+### Slice-purity verification for stacked PRs
+
+For a stacked PR series, run `git diff --name-only` between every adjacent pair of commits. Each output should be exactly the files in that slice's intended scope. Any contamination = slice-impure = PR-blocking.
+
+```bash
+git diff --name-only main..<commit-1>          # slice 1 files only
+git diff --name-only <commit-1>..<commit-2>    # slice 2 files only
+git diff --name-only <commit-2>..<commit-3>    # slice 3 files only
+```
+
+If a slice expected to be docs-only contains code (or vice versa), reject and ask the builder to restack. In the reference session this verified a 5-commit chain (`#616 → #607 → #614 → #609 → #608`) where each slice's diff matched its declared scope file-for-file.
+
+### Working-tree grep vs git ref grep (a gotcha)
+
+When verifying **staged-but-uncommitted** builder changes, use filesystem grep, NOT `git grep` on a branch ref:
+
+- `git grep <pattern> <ref>` shows the **committed** state of that ref. Uncommitted changes are invisible.
+- `grep -rn <pattern> <dir>` shows the **working-tree** state, including staged-but-uncommitted edits.
+
+In the reference session, the reviewer almost incorrectly accused the builder of false claims because `git grep "z.uuid" fix/zod-v4-uuid-baseline` returned the original (uncommitted-fix) string. A filesystem grep would have shown the correct staged change.
+
+**Rule**: when verifying changes that aren't yet in a commit, use filesystem grep.
+
+### Wider grep before posting fix recommendations
+
+Before recommending "fix file X," grep the rest of the repo to confirm the fix doesn't create inconsistency with sibling files. The canonical near-miss: a reviewer once recommended fixing `pipeline.schema.ts` only, when 3 other packages used the same pattern — the recommendation would have created syntax inconsistency in 3 unrelated files. Always grep wider than the failing file.
+
+### Hook output verbatim, not summarized
+
+When the builder posts a hook failure, demand the FULL hook output verbatim before accepting any "unrelated baseline" claim. In the reference session, the builder summarized a hook failure as "compile-time @claims/errors in pipeline-engine.test.ts" — wrong on three counts (it was runtime not compile, the file was `pipeline.schema.ts` not `pipeline-engine.test.ts`, and the same builder fixed it in the same commit). The full output would have made the misdiagnosis visible immediately.
+
+---
+
+## Writing to agentchat.md
+
+### Append-only, monotonic, end-of-file
+
+- Entries are **append-only to the END of the file**. Never insert in the middle.
+- Tags (`R-001`, `R-002`, ...) must be **monotonically increasing and unique**. If your number already exists in the file, use the next available number instead.
+- Reordering or middle-inserting breaks readability and creates duplicate-tag confusion that the operator must waste time disambiguating.
+
+### Canonical write pattern: heredoc append
+
+The recommended way to write to `agentchat.md` is a single-quoted heredoc append:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+### [R-NNN] HH:MM UTC — #ticket-or-topic
+DECISION: accept
+TECHNICAL: accept
+PROCESS: accept
+WHY:
+- <bullets>
+INDEPENDENT VERIFICATION:
+- <commands run + output>
+NEXT:
+- <next action>
+AGENTCHAT_EOF
+```
+
+Why a single-quoted heredoc:
+
+- **`cat >>` is byte-atomic** at the kernel level (`O_APPEND` syscall). It cannot be interrupted by another process writing the same file. This eliminates the race condition that `Edit` / `Write` tools hit when something else (a hook, the builder, a daemon) modifies the file between your read and your write.
+- **`<<'AGENTCHAT_EOF'`** with the single quotes prevents shell expansion of `$`, backticks, and other shell metacharacters that commonly appear in test output, file paths, commit hashes, and error messages. Without the quotes, your entry will be silently mangled.
+- **`Edit` / `Write` tools are a fallback only.** They may race with concurrent writers and they may fail with "file modified since read" errors when something else touched the file. Use heredoc append by default.
+
+In one ~5-hour reference session, ~10 reviewer writes using the heredoc pattern hit zero races. The 3 prior writes using Edit/Write all hit "file modified since read" failures and required stop-write-restart cycles.
+
+---
+
 ## Session end report
 
 When the operator signals end-of-session OR when 12 hours of session time have elapsed, post `[R-FINAL]` with the session metrics report. Use `multicheck/.framework/templates/session-report.md` as the template.

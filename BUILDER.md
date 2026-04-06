@@ -205,6 +205,45 @@ When an entry materially affects an issue (decision logged, fix verified, blocke
 
 ---
 
+## Writing to agentchat.md
+
+### Append-only, monotonic, end-of-file
+
+- Entries are **append-only to the END of the file**. Never insert in the middle.
+- Tags (`S-001`, `S-002`, ...) must be **monotonically increasing and unique**. If your number already exists in the file, use the next available number instead.
+- Reordering, renumbering, or middle-inserting entries breaks readability for the human operator and creates duplicate-tag confusion that the reviewer must waste time disambiguating.
+
+In a reference session, builder tooling inserted entries `[S-022..S-025]` in the middle of the file with duplicate `S-023` and `S-025` tags. Now a hard rule.
+
+### Canonical write pattern: heredoc append
+
+The recommended way to write to `agentchat.md` is a single-quoted heredoc append:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+### [S-NNN] HH:MM UTC — #ticket-or-topic
+STATE: building
+CLAIM: one sentence
+PROOF:
+- code: <file:line>
+- test: <command + counts>
+RISK: low
+ASK: review
+NEXT: next action
+AGENTCHAT_EOF
+```
+
+Why a single-quoted heredoc:
+
+- **`cat >>` is byte-atomic** at the kernel level (`O_APPEND` syscall). It cannot be interrupted by another process writing the same file. This eliminates the race condition that `Edit` / `Write` tools hit when something else (a hook, a daemon, the reviewer) modifies the file between your read and your write.
+- **`<<'AGENTCHAT_EOF'`** with the single quotes prevents shell expansion of `$`, backticks, and other shell metacharacters that commonly appear in code references, commit hashes, test output, and error messages. Without the quotes, your entry will be silently mangled.
+- **`Edit` / `Write` tools are a fallback only.** They may race with concurrent writers and they may fail with "file modified since read" errors when something else touched the file. Use heredoc append by default.
+
+In one ~5-hour reference session, ~10 reviewer writes using the heredoc pattern hit zero races. The 3 prior writes using Edit/Write all hit "file modified since read" failures.
+
+---
+
 ## Final rule
 
 The reviewer does not trust your status updates. It checks code, tests, deploys, and database writes. Your job is not to convince the reviewer. Your job is to leave evidence so complete that no convincing is needed.
