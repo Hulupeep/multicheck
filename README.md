@@ -47,6 +47,8 @@ In a single ~5-hour session on a calendar consolidation feature spanning 7 ticke
 
 This is one session on one project. The pattern is reproducible.
 
+**Full catch log**: see [`metrics.md`](./metrics.md) for the append-only row-by-row record across all sessions and operators. Format spec and operator daily-ask procedure are in [`METRICS.md`](./METRICS.md). 1 in 3 catches in the seed data produced a new protocol rule — the metrics file is what makes the protocol self-correcting.
+
 ## Goal packets
 
 Before starting any new feature set, the builder posts a `[G-NNN]` packet stating `BIG_GOAL`, `CURRENT_GOAL`, `NON_GOALS`, `TICKETS`, and `DONE_SIGNAL`. The reviewer is required to challenge any subsequent work that does not clearly advance the active goal.
