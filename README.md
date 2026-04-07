@@ -134,17 +134,37 @@ multicheck/
 
 ## Files in this repo
 
+**Canonical specs (full protocol):**
 - `BUILDER.md` — the canonical builder LLM instructions
 - `REVIEWER.md` — the canonical reviewer LLM instructions
 - `METRICS.md` — operator's daily-ask procedure for catch logging
+
+**Aggregate data:**
 - `metrics.md` — append-only catch log across all sessions and operators
-- `templates/details.md` — standardized project brief, copied into each target
+
+**Templates copied into target projects during Phase 0:**
+- `templates/details.md` — standardized project brief
 - `templates/agentchat.md` — chat file scaffold with vocabulary documented inline
 - `templates/session-report.md` — end-of-session metrics scaffold
-- `templates/metrics.md` — empty metrics file for target projects
-- `templates/protocol-summary.md` — protocol summary auto-injected into `AGENTS.md`, `CLAUDE.md`, and `multicheck/details.md` so the rules live in stable project memory, not just in the running chat
+- `templates/metrics.md` — empty metrics file
+- `templates/claude-md.md` — **reviewer-role** protocol anchor, auto-injected into `CLAUDE.md` (Claude Code reads this at session entry)
+- `templates/agents-md.md` — **builder-role** protocol anchor, auto-injected into `AGENTS.md` (Codex reads this at session entry)
 
 No scripts. No JSON. No hooks. No daemons. Just markdown the agents read and follow.
+
+## The 3-layer architecture
+
+The multicheck protocol exists at three layers, each with different mutability and a different reader:
+
+| Layer | File(s) | Mutability | Read by | Purpose |
+|---|---|---|---|---|
+| **Upstream reference** | `multicheck/.framework/REVIEWER.md`, `BUILDER.md`, `METRICS.md` | Version-locked at session start (cloned from this repo) | On-demand, when the project anchor says "read it" | Canonical spec; never changes mid-session |
+| **Project anchor** | `CLAUDE.md` (reviewer-role) and `AGENTS.md` (builder-role) in the target repo | Refreshed once per session by Phase 0 | Auto-loaded by Claude Code / Codex at **session entry**, before any work | Role-specific pointers; survives fresh sessions; tells the agent the protocol exists |
+| **Session state** | `multicheck/details.md` ("Active Protocol" section) and `multicheck/agentchat.md` | Changes constantly (every substantive action) | After the agent enters the repo and starts working | Live rules + the running ledger |
+
+The dominant failure mode in real sessions is **session-entry drift**: a fresh agent session starts, reads `CLAUDE.md` / `AGENTS.md`, sees no mention of multicheck, and starts editing code without ever knowing there's a reviewer loop running. Phase 0 fixes this by refreshing the role-split anchors so every session entry sees the protocol immediately.
+
+The role split matters: Claude Code reads `CLAUDE.md` and IS the reviewer (in the default pairing). Codex reads `AGENTS.md` and IS the builder. Each anchor file has only the rules for that agent's role — no role confusion, no wasted context. If the operator flips the pairing, swap the templates. The pattern is documented in BUILDER.md's Phase 0 step 5.
 
 ---
 

@@ -39,15 +39,19 @@ Before posting anything, set up the working folder:
    cp multicheck/.framework/templates/agentchat.md multicheck/agentchat.md
    ```
 
-5. **Refresh the protocol summary in stable project-memory locations.** The biggest cause of mid-session drift is that the protocol lives only in `multicheck/agentchat.md` (a running ledger), not in any file the agent runtime auto-loads. Codex auto-loads `AGENTS.md`. Claude Code auto-loads `CLAUDE.md`. Multicheck always has `multicheck/details.md`. Refresh the protocol summary in all three:
+5. **Refresh role-split protocol anchors in `CLAUDE.md` and `AGENTS.md`.** The biggest cause of mid-session drift is that the protocol lives only in `multicheck/agentchat.md` (a running ledger), not in any file the agent runtime auto-loads at session entry. **Claude Code auto-loads `CLAUDE.md`. Codex auto-loads `AGENTS.md`.** Without these in place, a fresh session entering the repo edits code without ever knowing there's a reviewer loop running.
+
+   The default pairing is **Claude reviewer + Codex builder**. So:
+   - `CLAUDE.md` gets the **reviewer** instructions (`templates/claude-md.md`)
+   - `AGENTS.md` gets the **builder** instructions (`templates/agents-md.md`)
+
+   Refresh both idempotently:
 
    ```bash
-   # The single source of truth is the version-locked template
-   SECTION_FILE="multicheck/.framework/templates/protocol-summary.md"
-
    # Helper: idempotently replace any existing multicheck section, or append if absent
-   refresh_protocol_section() {
+   refresh_anchor() {
      local target="$1"
+     local section_file="$2"
      if [ -f "$target" ] && grep -q '<!-- multicheck:start -->' "$target"; then
        # Remove old section between markers
        sed -i.bak '/<!-- multicheck:start -->/,/<!-- multicheck:end -->/d' "$target"
@@ -55,20 +59,37 @@ Before posting anything, set up the working folder:
      fi
      # Append fresh section (creates the file if it doesn't exist)
      if [ -f "$target" ]; then
-       cat "$SECTION_FILE" >> "$target"
+       cat "$section_file" >> "$target"
      else
-       cp "$SECTION_FILE" "$target"
+       cp "$section_file" "$target"
      fi
    }
 
-   refresh_protocol_section AGENTS.md
-   refresh_protocol_section CLAUDE.md
-   refresh_protocol_section multicheck/details.md
+   # Default pairing: Claude=reviewer, Codex=builder
+   refresh_anchor CLAUDE.md  multicheck/.framework/templates/claude-md.md
+   refresh_anchor AGENTS.md  multicheck/.framework/templates/agents-md.md
    ```
 
-   This is **idempotent** — re-running setup removes the old section between the markers and appends a fresh one. Existing project content in `AGENTS.md` / `CLAUDE.md` is preserved; only the multicheck section is replaced.
+   This is **idempotent** — re-running setup removes the old section between the markers and appends a fresh one. Existing project content in `CLAUDE.md` / `AGENTS.md` is preserved; only the multicheck section is replaced.
 
-   If the target project uses other agent runtimes (Aider, GitHub Copilot, etc.) with their own auto-loaded instructions file, copy `multicheck/.framework/templates/protocol-summary.md` into that file too, with the same marker discipline.
+   ### If the operator has flipped the pairing
+
+   If you are running Claude as builder + Codex as reviewer (or any other non-default pairing), swap the templates:
+
+   ```bash
+   refresh_anchor CLAUDE.md  multicheck/.framework/templates/agents-md.md  # Claude is builder
+   refresh_anchor AGENTS.md  multicheck/.framework/templates/claude-md.md  # Codex is reviewer
+   ```
+
+   Each template has a "Pairing override" note at the bottom telling the agent to consult the other file if the default doesn't apply.
+
+   ### Other agent runtimes
+
+   If the target project uses Aider, GitHub Copilot, or another agent runtime with its own auto-loaded instructions file (e.g. `.cursor/rules/*.md`, `.github/copilot-instructions.md`), copy the appropriate role template into that file too with the same marker discipline. The framework only auto-handles `CLAUDE.md` and `AGENTS.md` because those are the most common.
+
+   ### Why two files instead of one shared file
+
+   The 3-layer architecture: **upstream reference** (`multicheck/.framework/`, version-locked), **project anchor** (`CLAUDE.md` + `AGENTS.md`, refreshed once per session), **session state** (`multicheck/agentchat.md` + `multicheck/details.md`, changes constantly). Each layer has different mutability and different readers. Role-split anchors at the project layer match the role-split runtime — Claude reads `CLAUDE.md` and IS the reviewer; Codex reads `AGENTS.md` and IS the builder. Same content in both files would create role confusion and waste context.
 
 6. **Fill in `multicheck/details.md` with REAL values from the target project.** Not placeholders. Inspect the actual repo:
    - `git remote -v` for the URL

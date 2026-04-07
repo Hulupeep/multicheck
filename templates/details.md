@@ -5,9 +5,15 @@ Filled by the builder during Phase 0 setup.
 Do not leave placeholders. Use real values from the target repo.
 The reviewer reads this as source of truth — inaccurate details = unverifiable session.
 
-The "multicheck protocol" section near the bottom of this file is auto-refreshed
-on each session start by Phase 0. Do not edit it manually — edit
-multicheck/.framework/templates/protocol-summary.md upstream and re-run setup.
+The full protocol summary is NOT in this file. It lives in:
+- CLAUDE.md (reviewer instructions, auto-loaded by Claude Code)
+- AGENTS.md (builder instructions, auto-loaded by Codex)
+- multicheck/.framework/REVIEWER.md and BUILDER.md (full specs)
+
+This file is for project-specific brief + session state. The "Active Protocol"
+section near the bottom is the manually-maintained session-state summary —
+chat path, active goal, any session-specific overrides. The builder updates it
+as the session evolves.
 -->
 
 ## Repo
@@ -109,9 +115,20 @@ Pre-existing failures discovered later become disputes that burn hours.
 ## Notes
 <!-- Anything else the reviewer needs to verify the work -->
 
+## Active Protocol
 <!--
-The multicheck protocol summary will be auto-inserted below this line by
-Phase 0 setup, between <!-- multicheck:start --> and <!-- multicheck:end -->
-markers. Do not delete the markers if you see them — Phase 0 uses them to
-find and replace the section on each session start.
+Session-state summary, manually maintained by the builder/operator.
+This is the "what's currently true for this session" section, distinct from
+the stable protocol anchors in CLAUDE.md / AGENTS.md.
+
+Update this whenever the chat path moves (e.g., after archive-request rotation),
+when a new [G-NNN] becomes active, or when session-specific protocol overrides
+are agreed.
 -->
+
+- **Live chat path**: `multicheck/agentchat.md` (or `specs/agentchat.md` if pre-rotation)
+- **Active goal**: `[G-NNN]` (cite the goal packet number)
+- **Framework version**: `multicheck c<commit-sha>` (from `multicheck/.framework/`)
+- **Pairing**: Claude reviewer + Codex builder (or note if flipped)
+- **Session-specific overrides**: none (or list)
+- **For full protocol**: see `CLAUDE.md` (reviewer) / `AGENTS.md` (builder) / `multicheck/.framework/`
