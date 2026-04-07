@@ -147,6 +147,7 @@ The reviewer is required to challenge any subsequent builder work that does not 
 - **`verifying`** — running tests, hitting URLs, querying DB
 - **`blocked`** — cannot proceed without external action; name the exact blocker
 - **`bypass-request`** — you want to use `--no-verify`, `--force`, delete a lockfile, or otherwise route around an enforced gate. **Wait for `H-NNN` (human) or `R-NNN` (reviewer) authorization before proceeding.** Do not bypass first and disclose later.
+- **`archive-request`** — operator has instructed you to rotate the current chat and start a new feature set. **Wait for reviewer ack before moving any files.** See "Archive policy" section below.
 - **`scope-expansion`** — the file list you are about to commit exceeds the in-scope list in `details.md`. Post BEFORE committing, not after. Update `details.md` in the same entry.
 - **`self-correction`** — you caught a mistake in your own prior entry. This is high-value behavior. Cite the prior entry by number, state the mistake, state the correction, re-verify.
 - **`ready-for-review`** — the slice is complete and the **full end-gate** has passed. Not a targeted unit test. Not `--runTestsByPath`. The exact command in `details.md`'s `end-gate command` field.
@@ -288,6 +289,165 @@ Why a single-quoted heredoc:
 - **`Edit` / `Write` tools are a fallback only.** They may race with concurrent writers and they may fail with "file modified since read" errors when something else touched the file. Use heredoc append by default.
 
 In one ~5-hour reference session, ~10 reviewer writes using the heredoc pattern hit zero races. The 3 prior writes using Edit/Write all hit "file modified since read" failures.
+
+---
+
+## Archive policy
+
+There are two archive triggers in Phase 1. Both move files into `multicheck/archive/`.
+
+### Trigger 1 — Session start (automatic)
+
+When you run Phase 0 in a target project that already has a `multicheck/` folder, every file and folder inside it (except `archive/` itself) is moved to `multicheck/archive/<UTC-timestamp>/` before the new session begins. This is the existing Phase 0 step 2 — see above. Automatic, no operator decision.
+
+### Trigger 2 — Feature-set rotation (operator-instructed, opt-in)
+
+When the operator says something like:
+
+- "move on to the next feature, archive the current"
+- "archive this and start fresh"
+- "rotate the chat"
+- "wrap up <feature>, start <next>"
+
+...do the following, in order. Do NOT skip any step.
+
+#### Step 1 — Pause and request reviewer ack
+
+Post a builder entry:
+
+```md
+### [S-NNN] HH:MM UTC — archive request
+STATE: archive-request
+CLAIM: operator instructed feature-set rotation; pausing for reviewer ack before moving files
+PROOF:
+- operator instruction: <verbatim quote of what the operator said>
+- active goal: [G-NNN] (CURRENT_GOAL: "...")
+- DONE_SIGNAL status: <met | abandoned by operator decision>
+- open ASK: review packets: <list, or "none">
+- open bypass-request packets: <list, or "none">
+- proposed archive descriptor: <e.g. "calendar-consolidation">
+RISK: low
+ASK: review
+NEXT: await [R-NNN] DECISION: accept on the rotation, then execute the move
+```
+
+The reviewer will check that nothing in flight would be lost and ack with `[R-NNN] DECISION: accept`. If the reviewer rejects (open work, missing disclosure, etc.), close out those items first.
+
+#### Step 2 — Append ARCHIVED footer to the current chat
+
+After reviewer ack, append a final footer to `multicheck/agentchat.md` using the heredoc pattern:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+---
+## ARCHIVED — HH:MM UTC
+- Feature set: <descriptor>
+- Active goal at archive time: [G-NNN] (CURRENT_GOAL: "...")
+- DONE_SIGNAL: <met | abandoned>
+- Reason: operator instruction to start next feature
+- Last builder tag: [S-NNN]
+- Last reviewer tag: [R-NNN]
+- Next chat: multicheck/agentchat.md (fresh, starts with [G-(NNN+1)])
+AGENTCHAT_EOF
+```
+
+#### Step 3 — Move the chat and snapshot details.md
+
+```bash
+ARCHIVE_DIR="multicheck/archive/$(date -u +%Y-%m-%dT%H-%M-%SZ)-<descriptor>"
+mkdir -p "$ARCHIVE_DIR"
+mv multicheck/agentchat.md "$ARCHIVE_DIR/agentchat.md"
+cp multicheck/details.md "$ARCHIVE_DIR/details.md"
+```
+
+`mv` the chat (it leaves the live folder). `cp` the details (live `details.md` stays in place; the snapshot in the archive preserves the state at moment of rotation). The descriptor must be the one you proposed in Step 1 and the reviewer accepted.
+
+#### Step 4 — Create a fresh agentchat.md
+
+Copy from the framework template:
+
+```bash
+cp multicheck/.framework/templates/agentchat.md multicheck/agentchat.md
+```
+
+#### Step 5 — Add "Related archives" header to the new chat
+
+Append to the new `multicheck/agentchat.md`, BEFORE any entries:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+## Related archives
+
+<!--
+Operator-curated. The most recent archive is added automatically at rotation
+time. Add older archives manually as their context becomes relevant to the
+current feature set.
+-->
+
+- `archive/<UTC>-<descriptor>/` — prior feature set, ended at [G-NNN] (DONE_SIGNAL: <met | abandoned>). <one-line note on why it might be relevant to the new feature set>
+
+AGENTCHAT_EOF
+```
+
+By default, the new chat links to **only** the immediately previous archive. As work proceeds, you (or the operator) may add links to older archives whose context becomes relevant. Don't link every prior archive — link the ones the reviewer might actually need to consult.
+
+#### Step 6 — Update details.md for the new feature set
+
+Edit `multicheck/details.md` to reflect the new feature set:
+
+- New "Current focus issues"
+- New "In-scope files" for the first ticket of the new set
+- Reset "Baseline health" — the reviewer will re-run the pre-flight check on the new HEAD
+- Keep historical fields unchanged (Repo, Environments, etc.)
+
+#### Step 7 — Post the new [G-NNN] goal packet
+
+Append to the new `multicheck/agentchat.md` using the heredoc pattern:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+### [G-(NNN+1)] HH:MM UTC — <new feature set name>
+BIG_GOAL: ...
+CURRENT_GOAL: ...
+NON_GOALS:
+- ...
+TICKETS:
+- ...
+DONE_SIGNAL: ...
+AGENTCHAT_EOF
+```
+
+Use the next sequential goal number — if the archived chat ended at `[G-002]`, the new chat starts at `[G-003]`. Goal numbering is monotonic across rotations.
+
+#### Step 8 — Continue with the next builder entry
+
+Post `[S-(M+1)]` where `M` is the last `S-NNN` in the archived chat. **Tag numbering continues across rotations** — if the archived chat ended at `[S-035]`, the new chat starts at `[S-036]`. Same for `[R-NNN]`. This preserves cross-archive references like "as we said in `[S-029]`."
+
+### Tag numbering across rotations
+
+`S-NNN`, `R-NNN`, and `G-NNN` are **monotonic across the entire project's history**, not per-chat. The archive contains the older entries; the live chat has the newer ones; references in either direction stay valid. **Never reset numbering on rotation.**
+
+### Maintaining "Related archives"
+
+The "Related archives" section in the new chat is operator-curated. The format is:
+
+- Path: `archive/<UTC>-<descriptor>/`
+- Brief: one sentence on what that feature set was and why it might be relevant now
+
+This is the **only** cross-feature-set memory mechanism in Phase 1. Use it intentionally.
+
+### What is never archived
+
+- `multicheck/.framework/` — replaced on each session start by re-cloning
+- `multicheck/sessions/` — persistent session reports, kept across all sessions and feature sets
+- `multicheck/archive/` itself — destination, not source
+
+### Cleanup
+
+Not automatic. The operator decides when old archives can be deleted. Phase 1 makes no decisions about retention.
 
 ---
 

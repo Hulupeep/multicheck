@@ -15,6 +15,9 @@ STATE values (builder)
   blocked           — cannot proceed without external action
   bypass-request    — wants to use --no-verify / --force / similar; MUST wait
                       for H-NNN or R-NNN authorization before proceeding
+  archive-request   — operator instructed feature-set rotation; MUST wait for
+                      [R-NNN] ack before moving any files. See BUILDER.md
+                      "Archive policy" for the 8-step rotation procedure.
   scope-expansion   — committing files outside in-scope list; post BEFORE commit
   self-correction   — caught own mistake before reviewer; cite prior entry,
                       state correction, re-verify (HIGHEST-VALUE BEHAVIOR)

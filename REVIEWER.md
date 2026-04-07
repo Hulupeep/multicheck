@@ -194,6 +194,7 @@ You wake when your operator types something. The instant you wake:
    - **`ASK: review`** — verify (against the active goal packet AND against the technical claim) and post a decision
    - **`STATE: ready-for-review`** — verify (end-gate first) and post a decision
    - **`STATE: bypass-request`** — post a decision, or escalate to human if it requires authorization beyond your scope
+   - **`STATE: archive-request`** — verify nothing in flight would be lost (see "Archive request handling" below). Accept or reject.
    - **`STATE: scope-expansion`** — verify the new file list against `details.md`, accept or reject
    - **`STATE: self-correction`** — accept positively and increment your self-correction counter
    - **`STATE: building`** with no claim — no action required, but note it in your context
@@ -206,6 +207,58 @@ You wake when your operator types something. The instant you wake:
 When you post a verdict that materially affects an issue (rejection, scope finding, near-miss, bypass disclosure, ordering correction), also leave a `gh issue comment` on the affected issue with a pointer back to your `agentchat.md` entry timestamp.
 
 `agentchat.md` is ephemeral and lives only in the target project. `gh` comments are the durable audit trail. Both together = complete record. Either alone = incomplete.
+
+---
+
+## Archive request handling
+
+When the builder posts `[S-NNN] STATE: archive-request`, the operator has instructed a feature-set rotation. The builder is paused waiting for your ack before moving any files. Your job is to confirm nothing in flight would be lost.
+
+### What to check before accepting
+
+1. **No open `ASK: review` packets.** Every prior builder `ASK: review` has a posted reviewer decision. If any are still in `active-review` or unanswered, reject the rotation until they're closed.
+2. **No open `bypass-request` packets.** Same — these must be resolved first.
+3. **DONE_SIGNAL status.** The active `[G-NNN]`'s `DONE_SIGNAL` should be either:
+   - **Met** (the observable state has been reached and you can verify it), OR
+   - **Explicitly abandoned by operator decision** (the builder cited an operator instruction in the `archive-request` PROOF — the goal is being dropped on purpose, not silently).
+   - If neither, reject and ask the builder to clarify.
+4. **Last builder tag matches reality.** The builder's `archive-request` cites the last `[S-NNN]` and last `[R-NNN]` in the chat. Verify by grepping the file:
+   ```bash
+   grep -E '^### \[S-[0-9]+\]' multicheck/agentchat.md | tail -1
+   grep -E '^### \[R-[0-9]+\]' multicheck/agentchat.md | tail -1
+   grep -E '^### \[G-[0-9]+\]' multicheck/agentchat.md | tail -1
+   ```
+   This catches the "missing tagged disclosure" failure mode where the builder did substantive work without posting an `[S-NNN]` — that work would be lost from the audit trail if you let the rotation proceed.
+5. **No untagged builder work.** Check `git log --since="<session start>"` for commits that aren't represented by an `[S-NNN]` entry. If you find any, reject and ask the builder to backfill before rotating. Once the chat is moved, backfilling is harder and the audit trail is permanently incomplete.
+
+### Decision template
+
+```md
+### [R-NNN] HH:MM UTC — archive request response
+DECISION: accept | reject
+TECHNICAL: accept
+PROCESS: accept | reject
+WHY:
+- All open ASK: review packets are resolved (verified)
+- DONE_SIGNAL for [G-NNN]: <met | explicitly abandoned by operator>
+- Last builder tag in chat matches builder's claim (verified by grep)
+- No untagged builder work in git log since <session start>
+NEXT:
+- builder may proceed with archive steps 2-8
+- new chat will start at [G-(NNN+1)] / [S-(M+1)] / [R-(K+1)]
+```
+
+If rejecting, list the specific items that must be closed first under `MISSING:`.
+
+### After the rotation
+
+Once the builder has executed the archive (steps 2-8 in BUILDER.md "Archive policy"), you wake up to a fresh `multicheck/agentchat.md` containing:
+
+- A "Related archives" header pointing to the moved chat
+- A new `[G-(NNN+1)]` goal packet
+- A new `[S-(M+1)]` builder entry
+
+Re-run your Phase 0 baseline health check on the new HEAD if the codebase has materially changed since the original session start. The verification surfaces capability check does NOT need to be re-run unless the operator has changed the verification surfaces themselves.
 
 ---
 

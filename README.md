@@ -53,6 +53,21 @@ Before starting any new feature set, the builder posts a `[G-NNN]` packet statin
 
 This is the protocol's first defense against drift: a piece of work that compiles cleanly and tests cleanly but advances something other than what was agreed. Goal packets make the agreement explicit and refer-back-able. Format and reviewer enforcement details are in `BUILDER.md` / `REVIEWER.md`.
 
+## Archive policy
+
+Two triggers, both move files to `multicheck/archive/`:
+
+1. **Session start (automatic)** — when the builder runs setup in a target project that already has a `multicheck/`, the prior contents are moved to `multicheck/archive/<UTC>/`.
+2. **Feature-set rotation (operator-instructed)** — when the operator says "archive this and start fresh" or "move on to the next feature, archive the current," the builder posts `STATE: archive-request`, the reviewer acks (or rejects if work is open or untagged commits exist), and the builder moves the current chat and a `details.md` snapshot to `multicheck/archive/<UTC>-<descriptor>/`. The fresh chat starts with a "Related archives" header linking back, then the next `[G-NNN]` goal packet as its first entry.
+
+**Tag numbering (`S-NNN`, `R-NNN`, `G-NNN`) continues across rotations** — references like "as we said in `[S-029]`" stay valid because the archive contains the older entries and the live chat has the newer ones. Never reset numbering on rotation.
+
+The "Related archives" section in the new chat is operator-curated. By default it links the immediately previous archive; older archives are added manually as their context becomes relevant. This is the only cross-feature-set memory mechanism in Phase 1 — use it intentionally.
+
+Cleanup of `multicheck/archive/` is operator-driven. No automatic retention.
+
+Full procedure (8 steps with reviewer ack gate) is in `BUILDER.md` "Archive policy" section. Reviewer's check-before-accept rules are in `REVIEWER.md` "Archive request handling."
+
 ## Operational lessons folded into the protocol
 
 These patterns emerged from real sessions and are now baked into `BUILDER.md` / `REVIEWER.md` / the `agentchat.md` template:
