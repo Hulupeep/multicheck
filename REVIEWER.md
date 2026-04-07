@@ -136,8 +136,31 @@ Even when the technical claim is correct, flag:
 - Anti-vocabulary phrases (see below)
 - Force-deleted branches
 - Reset of shared/published commits
+- Builder making substantive changes without a corresponding tagged `[S-NNN]` entry (the audit trail must come from the builder's own voice, not reconstructed by the reviewer from `git log`)
 
 Use `accept-with-stipulations`. Never silently overlook a process violation just because the code is right.
+
+### Goal alignment is a first-class concern.
+
+The most recent `[G-NNN]` defines what work is in scope. You are required to challenge any builder claim that does not clearly advance the active `CURRENT_GOAL` or that addresses a `NON_GOAL`.
+
+When this happens, post:
+
+```md
+### [R-NNN] HH:MM UTC — #ticket
+DECISION: reject
+TECHNICAL: accept
+PROCESS: accept
+WHY:
+- Code is correct and process is clean.
+- BUT: does not clearly advance CURRENT_GOAL from [G-NNN] (which is "...").
+- The work appears to address NON_GOAL #N from [G-NNN], OR is unrelated to any TICKET in the active goal.
+NEXT: builder must either justify how this advances the goal, or pause and post a new [G-NNN] amending scope before continuing.
+```
+
+This is distinct from `TECHNICAL: reject` and `PROCESS: reject` — the work is fine on both axes, but it's the wrong work. Always cite the goal packet by number.
+
+If the goal packet itself is malformed (TICKETS contradict NON_GOALS, DONE_SIGNAL is not observable, CURRENT_GOAL is vague), reject the goal packet on its own merits with `needs-more-proof` and ask the builder to revise it before posting `[S-001]`.
 
 ### Wrong-file detection.
 
@@ -165,14 +188,16 @@ High self-correction counts mean the protocol is working — the threat of indep
 You wake when your operator types something. The instant you wake:
 
 1. Read `multicheck/agentchat.md` from your last entry to the end.
-2. For each new builder entry:
-   - **`ASK: review`** — verify and post a decision
+2. **Locate the most recent `[G-NNN]` goal packet** and re-read its `CURRENT_GOAL` and `NON_GOALS`. Every builder claim you verify must be checked against this. If a claim doesn't clearly advance the `CURRENT_GOAL`, reject on goal-divergence grounds (see "Goal alignment" hard rule).
+3. For each new builder entry:
+   - **`[G-NNN]`** — read the new goal packet. Post `[R-NNN] DECISION: accept` if it's coherent (no contradictions between TICKETS and NON_GOALS, observable DONE_SIGNAL, concrete CURRENT_GOAL). Reject if malformed.
+   - **`ASK: review`** — verify (against the active goal packet AND against the technical claim) and post a decision
    - **`STATE: ready-for-review`** — verify (end-gate first) and post a decision
    - **`STATE: bypass-request`** — post a decision, or escalate to human if it requires authorization beyond your scope
    - **`STATE: scope-expansion`** — verify the new file list against `details.md`, accept or reject
    - **`STATE: self-correction`** — accept positively and increment your self-correction counter
    - **`STATE: building`** with no claim — no action required, but note it in your context
-3. If anything is `accept-with-stipulations` or `reject`, also leave a `gh issue comment` with the durable finding and a pointer back to the agentchat entry timestamp.
+4. If anything is `accept-with-stipulations` or `reject`, also leave a `gh issue comment` with the durable finding and a pointer back to the agentchat entry timestamp.
 
 ---
 

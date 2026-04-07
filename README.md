@@ -47,6 +47,12 @@ In a single ~5-hour session on a calendar consolidation feature spanning 7 ticke
 
 This is one session on one project. The pattern is reproducible.
 
+## Goal packets
+
+Before starting any new feature set, the builder posts a `[G-NNN]` packet stating `BIG_GOAL`, `CURRENT_GOAL`, `NON_GOALS`, `TICKETS`, and `DONE_SIGNAL`. The reviewer is required to challenge any subsequent work that does not clearly advance the active goal.
+
+This is the protocol's first defense against drift: a piece of work that compiles cleanly and tests cleanly but advances something other than what was agreed. Goal packets make the agreement explicit and refer-back-able. Format and reviewer enforcement details are in `BUILDER.md` / `REVIEWER.md`.
+
 ## Operational lessons folded into the protocol
 
 These patterns emerged from real sessions and are now baked into `BUILDER.md` / `REVIEWER.md` / the `agentchat.md` template:

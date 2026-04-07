@@ -59,14 +59,17 @@ Before posting anything, set up the working folder:
 
    The reviewer uses `details.md` as the source of truth for what it can verify. Inaccurate details = unverifiable session.
 
-6. **Post your first entry** in `multicheck/agentchat.md`:
+6. **Post the initial goal packet** as `[G-001]` in `multicheck/agentchat.md`. Use the heredoc append pattern (see "Writing to agentchat.md" below). The format is documented in "Goal packets" below. The reviewer requires this packet before accepting any work.
+
+7. **Post your first builder entry** as `[S-001]` in `multicheck/agentchat.md`:
    - Identity (your model and provider)
    - Confirmation that you read this file end-to-end
+   - Reference to the active goal packet (`[G-001]`)
    - Wave plan with issue numbers per wave
    - First ticket and its end-gate command
    - Anything that requires human authorization upfront
 
-7. **Tell your operator: "Setup complete. Open Terminal B and start the reviewer."**
+8. **Tell your operator: "Setup complete. Open Terminal B and start the reviewer."**
 
 ---
 
@@ -91,6 +94,50 @@ NEXT: one concrete next action
 Numbering: builder entries are `S-001`, `S-002`, `S-003`, ... in strict sequence. Never reuse a number. If you supersede a previous entry, add `SUPERSEDES: S-NNN` on a line below `CLAIM`.
 
 Omit `PROOF` sub-bullets that don't apply. A code-only change has no `live` or `db`. A migration has no `live` until it's deployed.
+
+---
+
+## Goal packets
+
+Before starting any new feature set, you MUST post a `[G-NNN]` goal packet. The reviewer is required to challenge any subsequent work that does not clearly advance the most recent goal packet.
+
+A **feature set** is a coherent unit of work — typically 1-10 related tickets — that share a single `CURRENT_GOAL`. Examples: "ship the calendar consolidation," "remediate the zod baseline," "wire up the receipt endpoint." Whenever you transition from one of these to the next, post a new `[G-NNN]`.
+
+### Goal packet format
+
+```md
+### [G-NNN] HH:MM UTC — feature set name
+BIG_GOAL: <one sentence — the long-term destination this feature set serves>
+CURRENT_GOAL: <one sentence — what we are trying to achieve in this feature set, concretely>
+NON_GOALS:
+- <bullets — things we are explicitly NOT trying to do>
+- <including things that would be wrong to do even if technically valid>
+TICKETS:
+- #N — one-line description
+- #M — one-line description
+DONE_SIGNAL: <the observable state that means this feature set is complete>
+```
+
+Numbering: `G-001`, `G-002`, ... in strict sequence. Each new feature set gets a new packet. Goal packets supersede each other — the most recent `[G-NNN]` is the active goal.
+
+### When to post a new goal packet
+
+- **At session start** — `[G-001]` is the first entry in the chat, before any `[S-NNN]`
+- **When transitioning** from one coherent feature set to another
+- **When the human operator changes priorities or scope** mid-session
+- **When you discover the previous goal was wrong** — post a new `[G-NNN]` and explain the correction in the next `[S-NNN] STATE: self-correction` entry
+
+### What makes a good goal packet
+
+- **`BIG_GOAL`** is the WHY. It does not change often. The long-term destination this work serves.
+- **`CURRENT_GOAL`** is the WHAT. The concrete observable thing this feature set will deliver.
+- **`NON_GOALS`** are explicit. They include things that are technically valid but out of scope, AND things that would be actively wrong (e.g., "do not introduce a new schema column," "do not modify the read path while we cut over the write path").
+- **`TICKETS`** are specific issue numbers. If you are working without tickets, list the units of work that will be tackled.
+- **`DONE_SIGNAL`** is observable. Not "the code is good." Something like "all 5 PRs merged to main, end-gate passes on origin/main, no failing contracts." The reviewer uses this to know when to stop.
+
+### Reviewer responsibility
+
+The reviewer is required to challenge any subsequent builder work that does not clearly advance the active `[G-NNN]`. If you find yourself doing work that doesn't fit the goal, the right move is to post a new `[G-NNN]` first, then resume. Don't try to slip the work in under the old goal — the reviewer will catch it and reject on goal-divergence grounds.
 
 ---
 

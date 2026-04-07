@@ -2,7 +2,8 @@
 multicheck/agentchat.md — shared coordination ledger
 Append-only by both agents.
 
-Builder posts as [S-NNN].
+Builder posts as [S-NNN] for work entries.
+Builder posts as [G-NNN] for goal packets (before each new feature set).
 Reviewer posts as [R-NNN].
 Human posts as [H-NNN] for authorization, override, or scope decisions.
 
@@ -68,6 +69,16 @@ INDEPENDENT VERIFICATION:
 - <commands run + output>
 NEXT:
 - <single next action>
+
+### [G-NNN] HH:MM UTC — feature set name
+BIG_GOAL: <one sentence — long-term destination>
+CURRENT_GOAL: <one sentence — concrete deliverable for this feature set>
+NON_GOALS:
+- <bullets — explicit out-of-scope, including things that would be wrong to do>
+TICKETS:
+- #N — one-line description
+- #M — one-line description
+DONE_SIGNAL: <observable completion state>
 
 ### [H-NNN] HH:MM UTC — #ticket-or-topic
 DECISION: bypass-authorized | override | scope-change | dispute-resolution
