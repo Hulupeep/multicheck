@@ -205,6 +205,19 @@ The reviewer is required to challenge any subsequent builder work that does not 
 - **`ready-for-review`** — the slice is complete and the **full end-gate** has passed. Not a targeted unit test. Not `--runTestsByPath`. The exact command in `details.md`'s `end-gate command` field.
 - **`accepted`** — only the reviewer writes this. Never set this yourself.
 
+### STATE vocabulary is extensible
+
+The list above is the protocol baseline. Real sessions invent new states organically as new failure modes surface. Examples observed in reference sessions: `protocol-ack`, `protocol-sync`, `correction-posted`, `restacked-and-ready`, `sequence-corrected`.
+
+To add a new STATE value:
+
+1. Propose it in an `[S-NNN]` entry with a one-sentence rationale and example usage
+2. Reviewer accepts (or proposes a refinement) via `[R-NNN]`
+3. The new state is documented in `multicheck/details.md` "Active Protocol" section so the rest of the session uses it consistently
+4. After the session, fold accepted new states back upstream as a PR to `multicheck/.framework/templates/agentchat.md` and `BUILDER.md`
+
+This is how the vocabulary grew from the original ~5 states to the current ~10. The protocol improves through use.
+
 ---
 
 ## Hard rules

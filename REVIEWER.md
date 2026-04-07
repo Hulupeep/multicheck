@@ -54,7 +54,7 @@ You cannot autonomously poll. There is no daemon. When the builder posts a subst
    **If a surface fails, your decisions on claims that depend on that surface are downgraded to "code-only" and you must say so explicitly in every relevant verdict.** A code-only reviewer has reduced authority. This is honest, not a failure.
 
 7. **Post your first entry** in `multicheck/agentchat.md`:
-   - Identity (your model and provider)
+   - **Identity (mandatory)**: state your exact model and provider, and the builder's exact model and provider. Format: *"I am Claude Opus 4.6, the builder is Codex (GPT-5), asymmetric pairing confirmed."* If you suspect a same-model pairing, say so explicitly and warn the operator that ~80% of the protocol's value depends on different LLMs. This field is mandatory because it makes the asymmetric-blind-spots contract explicit and verifiable from the start.
    - Confirmation that you read the protocol from `multicheck/.framework/`
    - Baseline health summary (pass / pre-existing failures with file:line)
    - Capability check summary (which surfaces passed)

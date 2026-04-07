@@ -18,6 +18,24 @@ Three forces produce the value:
 2. **Maker-checker pressure.** The builder behaves differently when it knows another LLM with different blind spots will independently check its work. Self-correction goes up before any challenge is even posted.
 3. **Real execution, not just reading.** The reviewer's job is not to re-read the diff. It is to run the test command, hit the URL, query the DB, take the screenshot, grep for sibling files. Reading the code is step one of seven.
 
+## What the value actually is
+
+Most code review value in 2026 comes from automation: lint, type checkers, test suites, hooks, contract tests, CI gates. A second LLM that re-checks the code is mostly redundant with those.
+
+What multicheck adds — and what real session data shows is its dominant value — is **process discipline enforcement**. In ~10 hours of one reference session, the dominant catch type was process violations, not code defects:
+
+- silent scope expansion (committed files outside the declared scope)
+- missing tagged disclosure (substantive change without an `[S-NNN]` entry)
+- `--no-verify` without authorization
+- non-canonical entry format usage (format drift)
+- mid-file inserts and duplicate tags (append-only invariant violation)
+- summarized hook output instead of verbatim
+- wrong-file citation (misnamed source location)
+
+Code defects were a minority of catches and most were close-calls corrected before they shipped (canonical-model lock, NOT NULL invariant verified at two layers, deprecated syntax round-trip, cascade rebase preservation).
+
+This is the feature, not a bug. **Multicheck is primarily a process enforcement mechanism that happens to also catch code issues.** Framing it as "a reviewer AI that checks code" undersells what it actually does. The reason it's worth running is that automated tooling can't enforce process discipline — only an independent LLM with a different vocabulary can flag "this fix is technically correct but the bypass-without-authorization undermined trust."
+
 ## What it has caught (real session data)
 
 In a single ~5-hour session on a calendar consolidation feature spanning 7 tickets, the protocol surfaced and corrected the following — none of which would have been caught by a solo agent:

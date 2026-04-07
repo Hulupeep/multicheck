@@ -51,6 +51,13 @@ Severity: `low` | `medium` | `high` | `critical`. Caught by: `builder` | `review
 | 2026-04-07 | slice-impurity | medium | reviewer | verified 5-PR cascade rebase chain by `git diff --name-only A..B` between every adjacent commit (#617 → #618 → #619 → #620 → #621); each diff matched declared scope file-for-file; no contamination found, but the recipe itself caught a pre-rebase impurity in the prior round | reviewer's slice-purity verification recipe |
 | 2026-04-07 | process-violation | high | reviewer | builder made TWO substantive changes (deprecated z.uuid() patch round + test file fix round) without posting tagged [S-029]/[S-030] disclosures; reviewer reconstructed timeline from `git log` and demanded backfill before allowing the audit trail to freeze; led to "missing tagged disclosure" being added to the process violations list in REVIEWER.md | [R-021] |
 | 2026-04-07 | other | medium | reviewer | reviewer almost incorrectly accused builder of false claims because `git grep "z.uuid" fix/zod-v4-uuid-baseline` returned the original (uncommitted-fix) string; should have used filesystem `grep -rn` for staged-but-uncommitted changes; caught by reviewer self-check before posting | reference session — added "Working-tree grep vs git ref grep" gotcha to REVIEWER.md |
+| 2026-04-07 | technical-bug | high | reviewer | builder wrote `z.uuid()` fix, then wrote a revert, but left `invitation-routes.test.ts:27` inconsistent with the canonical pattern; caught by reviewer (different model than builder); same-model pairing would have missed it because the builder's blind spot was the same in both writes | invitation-routes.test.ts:27 |
+| 2026-04-07 | bonus-structural-verification | medium | reviewer | builder claimed `case_id` was non-null per the migration; reviewer went beyond the ask and verified at BOTH the migration DDL AND the Drizzle TS schema layers — stronger guarantee than what was claimed | [R-008] (also recorded earlier as a separate row from session 1) |
+| 2026-04-07 | other | high | reviewer | CI trigger gap on stacked PR #618: GitHub Actions silently filtered the workflow because `pull_request: branches: [main] + base-change-doesn't-fire-synchronize`; neither builder nor CI itself flagged it because both were looking at the wrong angle of the event stream; caught by reviewer checking the CI from outside the builder's perspective | #618 GitHub Actions, known stacked-PR pattern |
+| 2026-04-07 | other | medium | reviewer | `feature_calendar_service.yml` was not registered in `CONTRACT_INDEX.yml` on `origin/main`; PR #601 added other contracts without registering the calendar contracts; caught by reviewer's independent grep against origin/main, not by reading the working tree | grep CONTRACT_INDEX.yml on origin/main |
+| 2026-04-07 | other | critical | builder | builder diagnosed mid-session protocol drift caused by rules living only in the running ledger (`specs/agentchat.md`), not in any stable project-memory file; created Active Protocol section in `specs/details.md` as local fix; led to upstream `protocol-summary` template + 3-file refresh in Phase 0, later refined to role-split (claude-md.md / agents-md.md) at multicheck commit 529c9b5 | claims-monorepo [S-046], multicheck commits db0c8bf and 529c9b5 |
+| 2026-04-07 | other | high | operator | reviewer self-assessment: spent [R-018], [R-022], [R-025], [R-026] flagging symptoms of stable-context-file gap (duplicate tags, middle inserts, format drift) without identifying the root cause; the builder caught the root cause in [S-046] before the reviewer did; reviewer was treating symptoms not the disease | reference session R-FINAL self-assessment |
+| 2026-04-07 | process-violation | medium | reviewer | builder used non-canonical heading format `[S-NNN][builder][datestamp]` (vs the canonical `### [S-NNN] HH:MM UTC — #ticket`) for entries S-029 through S-034; format drift wasn't detected immediately because the watchdog silently skipped unparseable entries instead of escalating; led to "fail-loud watchdog" recommendation for Phase 2 | S-029 to S-034 format drift |
 
 ---
 
@@ -58,13 +65,46 @@ Severity: `low` | `medium` | `high` | `critical`. Caught by: `builder` | `review
 
 These are derived from the rows above and should be re-derived (not manually maintained) when this file grows substantially.
 
-- **Total catches logged**: 17
-- **Sessions represented**: 2 (2026-04-06 calendar consolidation, 2026-04-07 stack rebase)
-- **Pre-emptive self-corrections**: 4 (24% of all catches, all from a single session)
-- **Process violations**: 3 (--no-verify, middle-insert, missing disclosure)
-- **Reviewer recommendations corrected before posting**: 1 (would have created cross-package inconsistency)
-- **High-or-critical severity**: 6
-- **Operator catches**: 1 (tooling bug, not a missed protocol catch)
-- **Catches that produced new protocol rules**: 6 (`baseline-pre-existing-failure` → mandatory pre-flight; `process-violation` middle-insert → append-only rule; `process-violation` missing disclosure → first-class rejection ground; `recommendation-corrected` → wider grep before posting; `other` git ref grep gotcha → grep recipe; `heredoc-race-avoided` → canonical write pattern)
+- **Total catches logged**: 25
+- **Sessions represented**: 2 (2026-04-06 calendar consolidation, 2026-04-07 stack rebase + protocol meta-fixes)
+- **Pre-emptive self-corrections**: 4 (16% of all catches, all from session 1)
+- **Process violations**: 4 (--no-verify, middle-insert, missing disclosure, format drift)
+- **Technical bugs caught**: 2
+- **Reviewer recommendations corrected before posting**: 1
+- **Bonus structural verifications**: 2 (going beyond the ask)
+- **Asymmetric-blind-spot catches**: 2 confirmed (z.uuid round-trip, file citation error) — these would have been missed by same-model pairing
+- **High-or-critical severity**: 9
+- **Operator catches**: 2 (one tooling bug, one reviewer self-assessment)
+- **Catches that produced new protocol rules**: 9
+  - `baseline-pre-existing-failure` → mandatory pre-flight in REVIEWER.md
+  - `process-violation` middle-insert → append-only / monotonic hard rule
+  - `process-violation` missing disclosure → first-class rejection ground
+  - `recommendation-corrected` → wider grep before posting recipe
+  - `other` git ref grep gotcha → working-tree grep recipe in REVIEWER.md
+  - `heredoc-race-avoided` → canonical write pattern, hard rule in both BUILDER.md and REVIEWER.md
+  - `other` stable-context-file gap → role-split CLAUDE.md / AGENTS.md anchoring (Phase 0 step 5)
+  - `process-violation` format drift → STATE vocabulary extensibility doc + state-your-model in R-001
+  - 3-layer architecture documented in README
 
-The last bullet is the most important one: **1 in 3 catches in the seed data resulted in a protocol improvement.** That ratio will drop as the protocol matures, but the metrics file is also the input that drives those improvements. Honest catch logging is what makes the protocol self-correcting.
+**~36% of catches in the seed data produced new protocol rules.** That ratio will drop as the protocol matures, but the metrics file is also the input that drives those improvements. Honest catch logging is what makes the protocol self-correcting.
+
+## What the data says about value
+
+Looking at catch type distribution across the seed:
+
+| Catch type | Count | % of total |
+|---|---|---|
+| process-violation | 4 | 16% |
+| pre-emptive-self-correction | 4 | 16% |
+| other (mostly meta/protocol) | 5 | 20% |
+| recommendation-corrected | 1 | 4% |
+| technical-bug | 2 | 8% |
+| bonus-structural-verification | 2 | 8% |
+| slice-impurity | 2 | 8% |
+| goal-divergence | 1 | 4% |
+| baseline-pre-existing-failure | 1 | 4% |
+| heredoc-race-avoided | 1 | 4% |
+
+**Code defects (`technical-bug`) are 8% of catches. Process and meta findings are ~60%.** This is the dominant value the protocol delivers — automated tooling already catches code bugs at 90% recall; what it doesn't catch is process discipline erosion. Multicheck's value is in the 60%, not the 8%.
+
+The asymmetric-blind-spots argument (different-model-pairing > same-model-pairing) is empirically validated by 2 specific catches in the seed where a same-model pairing would have missed the finding because the builder's blind spot was the same in both writes.
