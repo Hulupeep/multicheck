@@ -4,6 +4,10 @@
 Filled by the builder during Phase 0 setup.
 Do not leave placeholders. Use real values from the target repo.
 The reviewer reads this as source of truth — inaccurate details = unverifiable session.
+
+The "multicheck protocol" section near the bottom of this file is auto-refreshed
+on each session start by Phase 0. Do not edit it manually — edit
+multicheck/.framework/templates/protocol-summary.md upstream and re-run setup.
 -->
 
 ## Repo
@@ -104,3 +108,10 @@ Pre-existing failures discovered later become disputes that burn hours.
 
 ## Notes
 <!-- Anything else the reviewer needs to verify the work -->
+
+<!--
+The multicheck protocol summary will be auto-inserted below this line by
+Phase 0 setup, between <!-- multicheck:start --> and <!-- multicheck:end -->
+markers. Do not delete the markers if you see them — Phase 0 uses them to
+find and replace the section on each session start.
+-->

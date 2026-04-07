@@ -39,7 +39,38 @@ Before posting anything, set up the working folder:
    cp multicheck/.framework/templates/agentchat.md multicheck/agentchat.md
    ```
 
-5. **Fill in `multicheck/details.md` with REAL values from the target project.** Not placeholders. Inspect the actual repo:
+5. **Refresh the protocol summary in stable project-memory locations.** The biggest cause of mid-session drift is that the protocol lives only in `multicheck/agentchat.md` (a running ledger), not in any file the agent runtime auto-loads. Codex auto-loads `AGENTS.md`. Claude Code auto-loads `CLAUDE.md`. Multicheck always has `multicheck/details.md`. Refresh the protocol summary in all three:
+
+   ```bash
+   # The single source of truth is the version-locked template
+   SECTION_FILE="multicheck/.framework/templates/protocol-summary.md"
+
+   # Helper: idempotently replace any existing multicheck section, or append if absent
+   refresh_protocol_section() {
+     local target="$1"
+     if [ -f "$target" ] && grep -q '<!-- multicheck:start -->' "$target"; then
+       # Remove old section between markers
+       sed -i.bak '/<!-- multicheck:start -->/,/<!-- multicheck:end -->/d' "$target"
+       rm -f "$target.bak"
+     fi
+     # Append fresh section (creates the file if it doesn't exist)
+     if [ -f "$target" ]; then
+       cat "$SECTION_FILE" >> "$target"
+     else
+       cp "$SECTION_FILE" "$target"
+     fi
+   }
+
+   refresh_protocol_section AGENTS.md
+   refresh_protocol_section CLAUDE.md
+   refresh_protocol_section multicheck/details.md
+   ```
+
+   This is **idempotent** — re-running setup removes the old section between the markers and appends a fresh one. Existing project content in `AGENTS.md` / `CLAUDE.md` is preserved; only the multicheck section is replaced.
+
+   If the target project uses other agent runtimes (Aider, GitHub Copilot, etc.) with their own auto-loaded instructions file, copy `multicheck/.framework/templates/protocol-summary.md` into that file too, with the same marker discipline.
+
+6. **Fill in `multicheck/details.md` with REAL values from the target project.** Not placeholders. Inspect the actual repo:
    - `git remote -v` for the URL
    - `git rev-parse HEAD` for the latest commit
    - `git rev-parse --abbrev-ref HEAD` for the branch
@@ -59,9 +90,9 @@ Before posting anything, set up the working folder:
 
    The reviewer uses `details.md` as the source of truth for what it can verify. Inaccurate details = unverifiable session.
 
-6. **Post the initial goal packet** as `[G-001]` in `multicheck/agentchat.md`. Use the heredoc append pattern (see "Writing to agentchat.md" below). The format is documented in "Goal packets" below. The reviewer requires this packet before accepting any work.
+7. **Post the initial goal packet** as `[G-001]` in `multicheck/agentchat.md`. Use the heredoc append pattern (see "Writing to agentchat.md" below). The format is documented in "Goal packets" below. The reviewer requires this packet before accepting any work.
 
-7. **Post your first builder entry** as `[S-001]` in `multicheck/agentchat.md`:
+8. **Post your first builder entry** as `[S-001]` in `multicheck/agentchat.md`:
    - Identity (your model and provider)
    - Confirmation that you read this file end-to-end
    - Reference to the active goal packet (`[G-001]`)
@@ -69,7 +100,7 @@ Before posting anything, set up the working folder:
    - First ticket and its end-gate command
    - Anything that requires human authorization upfront
 
-8. **Tell your operator: "Setup complete. Open Terminal B and start the reviewer."**
+9. **Tell your operator: "Setup complete. Open Terminal B and start the reviewer."**
 
 ---
 

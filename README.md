@@ -134,13 +134,17 @@ multicheck/
 
 ## Files in this repo
 
-- `BUILDER.md` — the only thing the builder LLM reads
-- `REVIEWER.md` — the only thing the reviewer LLM reads
+- `BUILDER.md` — the canonical builder LLM instructions
+- `REVIEWER.md` — the canonical reviewer LLM instructions
+- `METRICS.md` — operator's daily-ask procedure for catch logging
+- `metrics.md` — append-only catch log across all sessions and operators
 - `templates/details.md` — standardized project brief, copied into each target
 - `templates/agentchat.md` — chat file scaffold with vocabulary documented inline
 - `templates/session-report.md` — end-of-session metrics scaffold
+- `templates/metrics.md` — empty metrics file for target projects
+- `templates/protocol-summary.md` — protocol summary auto-injected into `AGENTS.md`, `CLAUDE.md`, and `multicheck/details.md` so the rules live in stable project memory, not just in the running chat
 
-Five files. No scripts. No JSON. No hooks. No daemons.
+No scripts. No JSON. No hooks. No daemons. Just markdown the agents read and follow.
 
 ---
 
