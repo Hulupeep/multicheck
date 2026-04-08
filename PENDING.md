@@ -305,6 +305,77 @@ The live session data between now and unfreeze may inform which option is right.
 
 ---
 
+### 5. Six-question pre-flight before every story
+
+- **Date queued**: 2026-04-08
+- **Source**: operator question "what should I ask the builder before it starts working on a story"
+- **Proposed location**: `BUILDER.md` new "Pre-flight questions" section (before the Message format section, as a pre-condition for every slice)
+- **Secondary location**: `REVIEWER.md` matching "Pre-flight verification" section with the reviewer-side check for each question; `templates/agents-md.md` top rules (one-liner reference)
+- **Severity**: high — addresses 6 of the 7 highest-severity catches in the current metrics.md in one checklist
+- **Metrics evidence**: the questions are derived one-per-incident from existing metrics.md rows; see mapping table in commit message
+
+#### Rule
+
+Before writing any code on a new story, the builder posts a `[S-NNN]` entry answering 6 questions. The reviewer verifies each answer independently before acking the pre-flight. The builder does not proceed to substantive `STATE: building` work until the pre-flight is acked.
+
+The 6 questions:
+
+1. **Goal fit** — active `[G-NNN]`, quoted `CURRENT_GOAL`, one-sentence advancement claim, `NON_GOAL` check
+2. **Branch topology** — `git fetch`, `rev-parse HEAD`, `rev-parse origin/main`, `merge-base HEAD origin/main`, YES/NO on match, rebase plan if NO
+3. **File targets** — list of files, `ls <path>` + `git log -1 <path>` output per file, `git log --diff-filter=DR <merge-base>..origin/main -- <path>` to catch renames
+4. **Scope declaration** — update `details.md` in-scope list, expected diff size, justification for anything not strictly needed
+5. **Value-set parity** — new enum/status/permission/claim values? If yes, list every layer (DB / Drizzle / TS union / Zod / exhaustive switch / OpenAPI / test fixtures)
+6. **End-gate + risk** — exact full pre-commit hook command (not targeted), baseline count on `origin/main`, predicted "2-hours-in, I realize X" failure mode
+
+#### Why this is different from PENDING items #1-#4
+
+Items #1-#4 are individual recipes that the reviewer applies during verification. Item #5 is a **mandatory pre-flight** that the builder runs at story start, before any code is written. It incorporates items #1 (diff-content check via file history), #2 (branch-base verification), #3 (cross-layer value-set parity), and #4 (specialist-persona sweep hints via Q6 risk question) into a single structured question set.
+
+When the fold-in happens, items #1-#4 may be partially subsumed by item #5. Decision during unfreeze: keep them as separate recipes (item #5 is the pre-flight, items #1-#4 are the verification recipes) OR collapse #1-#4 into item #5 (pre-flight is the new abstraction; recipes are checklist items inside it). The data will tell — if the pre-flight catches everything without needing the separate recipes, collapse; if the recipes catch things the pre-flight didn't anticipate, keep both.
+
+#### Questions-to-incidents mapping (justification for each)
+
+| Question | Prevents | Incident row in metrics.md |
+|---|---|---|
+| Q1 Goal fit | Work that's technically clean but doesn't advance the goal | Goal-divergence rejection template in REVIEWER.md |
+| Q2 Branch topology | 4-hour stale-branch-base incident | 2026-04-08 near-miss, PENDING #2 |
+| Q3 File targets | Audit against a file that's been renamed/deleted on current main | 2026-04-08 test-gap, [R-034] against consultation.repository.ts |
+| Q4 Scope declaration | Silent scope expansion (5 declared → 7 committed) | 2026-04-06 slice-impurity on #607 |
+| Q5 Value-set parity | Cross-layer enum drift (#610 `consultation_no_show`) | 2026-04-08 technical-bug, PENDING #3 |
+| Q6a Full end-gate | Targeted test passes, full hook surfaces unrelated failure that becomes bypass conversation | 2026-04-06 process-violation, [S-005] → [S-010] chain |
+| Q6b Risk prediction | "2 hours in, I realize X" class failures, addresses M2 checklist-fatigue via targeted prediction | Meta-observation M2 |
+
+**Every question is grounded in a specific high-severity incident we have empirical evidence of.** This is what makes the pre-flight worth the ~2 minutes per story: it's not a theoretical checklist, it's a direct inoculation against the failure modes that have actually cost real time in the reference sessions.
+
+#### Action during freeze
+
+- **Upstream `BUILDER.md` / `REVIEWER.md` / `templates/*`**: no change (queued here)
+- **Target project `multicheck/details.md` Active Protocol**: session-scoped application is reviewer's call; the operator can also just use the pre-flight prompt manually without adding it to any doc, since it's operator-driven discipline at story start
+
+#### Fold-in plan
+
+When the freeze ends:
+
+1. Add a new section to `BUILDER.md` titled "Pre-flight questions (before every story)" with the 6 questions and reviewer-verification mapping
+2. Add a matching `REVIEWER.md` section "Pre-flight verification" with the check for each question
+3. Update `templates/agents-md.md` top rules with a one-liner: *"Before writing code on any new story, post a [S-NNN] pre-flight entry answering 6 questions — see BUILDER.md 'Pre-flight questions'."*
+4. Update `templates/claude-md.md` top rules with a one-liner: *"Verify pre-flight answers independently before acking. Q2 (merge-base) and Q3 (file existence on current branch) are the highest-value checks."*
+5. Decide whether items #1-#4 stay as separate recipes or get collapsed into item #5 (see "Why this is different" above)
+6. Add a reference to the incident-to-question mapping table in the REVIEWER.md fold-in so future operators can see the empirical grounding for each question
+7. Commit message cites all the incident rows that motivated each question
+
+#### Phase 2+ automation
+
+Q2 (branch topology) and Q3 (file targets) are the two questions most amenable to automation:
+
+- A `multicheck-preflight.sh` script that runs all the `git` commands from Q2 and Q3 automatically and prints pass/fail — takes 5 seconds
+- A husky pre-commit hook that runs the same checks and blocks commits with stale merge-base
+- Optional: a `gh` extension that runs the pre-flight on every branch checkout
+
+The markdown questions are the baseline. The automated version is a Phase 2+ tooling layer. Markdown discipline catches the case where the builder is being careful; automation catches the case where the builder is tired, rushed, or new to the protocol.
+
+---
+
 ## Meta-observations
 
 Observations about patterns across queued items. Not rules themselves, but candidates for synthesized rules or architectural commentary in the unfreeze batch.
