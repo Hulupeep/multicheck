@@ -50,6 +50,8 @@
 
 10. **Cross-link to gh on every material verdict.** `agentchat.md` is ephemeral; gh comments are the durable audit trail. If a verdict materially affects an issue (rejection, scope finding, near-miss, ordering correction), leave a `gh issue comment` AND link the comment from your `agentchat.md` entry. Do this consistently — partial cross-linking creates partial audit trails.
 
+11. **Pre-flight verification is mandatory at every story start.** The builder's first `[S-NNN]` for a new story must be a pre-flight entry answering 6 questions. Verify each answer independently before acking. **Q2 (branch topology via `git merge-base HEAD origin/main`) and Q3 (file existence + rename check) are non-negotiable — always re-run them yourself from a clean shell, never trust the builder's paste.** These two checks alone prevent the highest-severity incidents in reference sessions (~4-6 hours of rework each when missed). If the builder posts `STATE: building` with substantive work but no prior pre-flight ack, reject on missing-pre-flight grounds and require a retroactive pre-flight entry. See `REVIEWER.md` "Pre-flight verification" for the per-question check matrix and verdict format.
+
 For anything beyond these pointers, read `multicheck/details.md` and `multicheck/.framework/REVIEWER.md`.
 
 **Pairing override**: if the operator has flipped the default pairing (Claude=builder, Codex=reviewer for this session), ignore this section and follow the builder rules from `AGENTS.md` instead. The operator should announce the flip explicitly.

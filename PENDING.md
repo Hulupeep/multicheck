@@ -14,6 +14,12 @@ During the freeze:
 
 When the freeze ends, this file gets read through, each queued item is folded (or rejected with rationale), and the file is reset to empty with a comment linking to the fold-in commit.
 
+### Partial unfreeze exceptions (documented)
+
+The freeze allows **partial unfreeze** for individual items when the operator judges the cost of waiting exceeds the cost of a single rule fold-in. Each partial unfreeze is documented below with rationale and commit reference, so the data-integrity impact is auditable.
+
+- **2026-04-08 — Item #5 (pre-flight questions) folded early.** Rationale: pre-flight is preventive, not reactive. Every session running without it is at direct risk of the highest-severity failure modes (stale-branch-base, wrong-file-target, silent-scope-expansion, cross-layer-drift). Items #1-#4 are reactive — they catch things during review, and the catches still land in `metrics.md` as evidence. Item #5 prevents stories from starting wrong. Folding it now costs one rule-set change in the claims-monorepo data stream but avoids the expected cost of another 4-hour stale-branch incident during the freeze window. Commit: see git log for the "freeze break for pre-flight only" commit in 2026-04-08. Items #1-#4 and the meta-observations remain queued.
+
 ## Why the freeze
 
 If the protocol changes every day, we can't compare session N to session N-1 — the rules under which each session ran are different, so the metrics distribution stops being meaningful. The freeze is a 3-5 day window of rule stability so that 3+ sessions produce comparable data. See README.md "3-layer architecture" + the freeze-rationale commentary in the PR that introduced this file.
@@ -305,14 +311,21 @@ The live session data between now and unfreeze may inform which option is right.
 
 ---
 
-### 5. Six-question pre-flight before every story
+### 5. Six-question pre-flight before every story — FOLDED 2026-04-08
 
-- **Date queued**: 2026-04-08
-- **Source**: operator question "what should I ask the builder before it starts working on a story"
-- **Proposed location**: `BUILDER.md` new "Pre-flight questions" section (before the Message format section, as a pre-condition for every slice)
-- **Secondary location**: `REVIEWER.md` matching "Pre-flight verification" section with the reviewer-side check for each question; `templates/agents-md.md` top rules (one-liner reference)
-- **Severity**: high — addresses 6 of the 7 highest-severity catches in the current metrics.md in one checklist
-- **Metrics evidence**: the questions are derived one-per-incident from existing metrics.md rows; see mapping table in commit message
+**Status: FOLDED into active protocol as a partial unfreeze exception.** See the "Partial unfreeze exceptions" section above.
+
+This item is now in:
+
+- `BUILDER.md` — new "Pre-flight questions (before every story)" section between "Goal packets" and "STATE values"
+- `REVIEWER.md` — new "Pre-flight verification" section with the per-question check matrix, plus updated "When you wake" entry types
+- `templates/agents-md.md` — new rule #11 pointing to `BUILDER.md` "Pre-flight questions"
+- `templates/claude-md.md` — new rule #11 pointing to `REVIEWER.md` "Pre-flight verification"
+
+The original queued item (format spec, incident mapping, Phase 2+ automation notes) is preserved below for historical reference but is no longer active queue content.
+
+<details>
+<summary>Original queued content (historical)</summary>
 
 #### Rule
 
@@ -373,6 +386,8 @@ Q2 (branch topology) and Q3 (file targets) are the two questions most amenable t
 - Optional: a `gh` extension that runs the pre-flight on every branch checkout
 
 The markdown questions are the baseline. The automated version is a Phase 2+ tooling layer. Markdown discipline catches the case where the builder is being careful; automation catches the case where the builder is tired, rushed, or new to the protocol.
+
+</details>
 
 ---
 

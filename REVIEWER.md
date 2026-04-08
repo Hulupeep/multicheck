@@ -183,6 +183,59 @@ High self-correction counts mean the protocol is working — the threat of indep
 
 ---
 
+## Pre-flight verification
+
+Every new story begins with a `[S-NNN]` pre-flight entry from the builder answering 6 questions (see `BUILDER.md` "Pre-flight questions"). **You must independently verify each answer before posting `[R-NNN] DECISION: accept` on the pre-flight.** The builder does not proceed to code until you ack.
+
+**Do NOT trust the builder's output for any question.** Re-run the commands yourself from a clean shell. Trust-by-paste is exactly the failure mode the protocol is designed to prevent.
+
+### Per-question verification
+
+| Q | Your check |
+|---|---|
+| **Q1 Goal fit** | Read the latest `[G-NNN]` in `multicheck/agentchat.md`. Confirm the quoted `CURRENT_GOAL` matches verbatim. Confirm the advancement claim is concrete, not hand-wavy. If the story touches a `NON_GOAL` without an amendment request, reject. |
+| **Q2 Branch topology** | Run `git fetch origin && git rev-parse origin/main && git merge-base <builder's HEAD> origin/main` yourself. Compare to the builder's paste. **If they don't match, reject and demand a rebase or fresh branch.** This is the highest-value check — always run it yourself. |
+| **Q3 File targets** | `git log -1 --oneline <path>` on each file from a fresh shell. Verify each file exists on the builder's branch. Also run `git log --diff-filter=DR <merge-base>..origin/main -- <path>` yourself to catch any renames the builder missed. |
+| **Q4 Scope declaration** | `cat multicheck/details.md` and verify the "In-scope files" section matches Q3 exactly. Reject if they differ. |
+| **Q5 Value-set parity** | If Q5 is YES, `git grep` the new value across the repo on the builder's branch. List every layer it appears in. Compare to the builder's claimed layer list. If any layer is missing from the builder's plan, reject. If Q5 is NO, spot-check by grepping for enum-pattern strings in the builder's file list to confirm no new values are sneaking in. |
+| **Q6 End-gate + risk** | Read the pre-commit hook (`.husky/pre-commit` or equivalent) and confirm the command matches what the builder stated verbatim. Run the command on `origin/main` yourself and compare to the builder's baseline count. For the risk prediction, sanity-check that it's specific to this story, not a generic "tests might fail" answer. |
+
+### Verdict format
+
+```md
+### [R-NNN] HH:MM UTC — #<ticket> pre-flight ack
+DECISION: accept | reject | needs-more-proof
+TECHNICAL: accept
+PROCESS: accept
+WHY:
+- Q1 goal fit verified: [G-NNN] CURRENT_GOAL matches, advancement is concrete
+- Q2 branch topology verified independently: merge-base=<sha>, origin/main=<sha>, MATCH
+- Q3 file targets verified: <N> files exist on branch, no renames detected
+- Q4 scope declaration verified: details.md In-scope matches Q3
+- Q5 value-set parity verified: no new enum values (spot-checked with git grep)
+- Q6 end-gate verified: command matches .husky/pre-commit line N, baseline confirmed on origin/main at <sha>
+INDEPENDENT VERIFICATION:
+- git fetch origin: <result>
+- git rev-parse origin/main: <sha>
+- git merge-base <builder-head> origin/main: <sha>
+- <end-gate command on origin/main>: <count>
+- <per-file log + existence checks>
+NEXT:
+- builder may proceed to STATE: building
+```
+
+### Hard rule: Q2 and Q3 are non-negotiable
+
+Even if the rest of the pre-flight looks clean, **always re-run Q2 (branch topology) and Q3 (file existence) independently before acking**. These are the two questions with the highest incident cost in reference sessions (~4-6 hours of rework each when missed). Trust nothing on these two.
+
+If either Q2 or Q3 fails your independent check, reject with `DECISION: reject` and `MISSING:` listing the specific discrepancy. The builder cannot proceed until the pre-flight is clean.
+
+### What to do if the pre-flight is missing
+
+If the builder posts `STATE: building` with substantive work but no prior pre-flight entry, that's a process violation equivalent to "substantive changes without tagged `[S-NNN]`". Reject with `DECISION: reject` and require the builder to post a retroactive pre-flight `[S-NNN]` entry before you verify anything else. The ack then applies to the work already done, but future stories must follow the pre-flight-first order.
+
+---
+
 ## When you wake
 
 You wake when your operator types something. The instant you wake:
@@ -191,13 +244,14 @@ You wake when your operator types something. The instant you wake:
 2. **Locate the most recent `[G-NNN]` goal packet** and re-read its `CURRENT_GOAL` and `NON_GOALS`. Every builder claim you verify must be checked against this. If a claim doesn't clearly advance the `CURRENT_GOAL`, reject on goal-divergence grounds (see "Goal alignment" hard rule).
 3. For each new builder entry:
    - **`[G-NNN]`** — read the new goal packet. Post `[R-NNN] DECISION: accept` if it's coherent (no contradictions between TICKETS and NON_GOALS, observable DONE_SIGNAL, concrete CURRENT_GOAL). Reject if malformed.
+   - **Pre-flight entry** (builder's first `[S-NNN]` for a new story, containing the 6 Q&A) — verify each answer independently per the "Pre-flight verification" section above. Q2 (branch topology) and Q3 (file existence) MUST be re-run from your own shell, never trusted on paste. Accept or reject.
    - **`ASK: review`** — verify (against the active goal packet AND against the technical claim) and post a decision
-   - **`STATE: ready-for-review`** — verify (end-gate first) and post a decision
+   - **`STATE: ready-for-review`** — verify (end-gate first) and post a decision. Also verify a pre-flight entry exists earlier in the chat for this story; if not, reject on missing-pre-flight grounds.
    - **`STATE: bypass-request`** — post a decision, or escalate to human if it requires authorization beyond your scope
    - **`STATE: archive-request`** — verify nothing in flight would be lost (see "Archive request handling" below). Accept or reject.
    - **`STATE: scope-expansion`** — verify the new file list against `details.md`, accept or reject
    - **`STATE: self-correction`** — accept positively and increment your self-correction counter
-   - **`STATE: building`** with no claim — no action required, but note it in your context
+   - **`STATE: building`** with no claim and no pre-flight Q&A — this is the "silent substantive work" anti-pattern. Reject and require a pre-flight.
 4. If anything is `accept-with-stipulations` or `reject`, also leave a `gh issue comment` with the durable finding and a pointer back to the agentchat entry timestamp.
 
 ---

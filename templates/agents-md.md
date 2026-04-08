@@ -50,6 +50,8 @@
 
 10. **Self-correction is the highest-value behavior in the protocol.** If you discover a mistake in your own prior work, post `STATE: self-correction` immediately with the diagnosis and fix. Do not wait for the reviewer to challenge you. The reviewer counts pre-emptive self-corrections as a positive metric and reports the count in `[R-FINAL]` at session end. In the canonical reference session, 4-of-4 drafted reviewer challenges were obsoleted by builder self-correction before they could be posted — that's the protocol working at maximum strength.
 
+11. **Pre-flight before every story** — mandatory. Before writing any code on a new story, post a `[S-NNN]` pre-flight entry answering 6 questions: (1) goal fit, (2) branch topology with `git merge-base` verification, (3) file targets with existence + rename check, (4) scope declaration in `details.md`, (5) value-set parity across all layers (DB / Drizzle / TS / Zod / switches / OpenAPI), (6) full end-gate command + baseline + risk prediction. Wait for `[R-NNN] DECISION: accept` on the pre-flight before proceeding to code. The reviewer will reject any later work that refers to code written before the pre-flight ack. See `BUILDER.md` "Pre-flight questions" for the full spec with commands to run. Cost ~2 minutes per story; prevents hours of rework from stale-branch-base, wrong-file-target, silent-scope-expansion, and cross-layer-drift failure modes.
+
 For anything beyond these pointers, read `multicheck/details.md` and `multicheck/.framework/BUILDER.md`.
 
 **Pairing override**: if the operator has flipped the default pairing (Codex=reviewer, Claude=builder for this session), ignore this section and follow the reviewer rules from `CLAUDE.md` instead. The operator should announce the flip explicitly.

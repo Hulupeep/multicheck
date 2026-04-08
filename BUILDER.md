@@ -193,6 +193,99 @@ The reviewer is required to challenge any subsequent builder work that does not 
 
 ---
 
+## Pre-flight questions (before every story)
+
+Before writing any code on a new story, you MUST post a `[S-NNN] STATE: building` entry answering the 6 questions below. Post via heredoc append. **Do not start coding until the reviewer acks the pre-flight with `[R-NNN] DECISION: accept`.**
+
+This is mandatory. The reviewer will reject any later `STATE: building` or `STATE: ready-for-review` entry that refers to code written before a pre-flight ack. Every question maps directly to a high-severity failure mode observed in reference sessions — the pre-flight is inoculation, not ceremony. Cost is ~2 minutes per story; savings are measured in hours of prevented rework.
+
+### The 6 questions
+
+#### 1. Goal fit
+
+- Which `[G-NNN]` is active right now? Quote `CURRENT_GOAL` verbatim.
+- How does this story advance `CURRENT_GOAL` in one sentence?
+- Does it touch any `NON_GOAL` from the active `[G-NNN]`? If yes, request a `[G-NNN]` amendment before proceeding.
+
+#### 2. Branch topology
+
+Run and paste the output:
+
+```bash
+git fetch origin
+git rev-parse HEAD
+git rev-parse origin/main
+git merge-base HEAD origin/main
+```
+
+Is `merge-base == origin/main HEAD`? YES/NO. If NO: **rebase onto `origin/main` OR create a fresh branch from `origin/main` BEFORE writing any code.** Do not proceed on a stale base. Reference incident: a live session lost 4 hours of work to a branch based on a weeks-old main; every other stage 0 gate passed, only this check would have caught it.
+
+#### 3. File targets
+
+- List the files you intend to edit.
+- For each file, run and paste:
+  ```bash
+  ls <path> && git log -1 --oneline <path>
+  ```
+  This confirms the file exists on your current branch and shows when it was last touched.
+- Check whether any of these files were renamed, moved, or deleted between your branch base and current main:
+  ```bash
+  git log --diff-filter=DR <merge-base>..origin/main -- <path>
+  ```
+  If yes, re-target to the current location before writing code. Reference incident: a reviewer audited `consultation.repository.ts` correctly, but that file had been renamed to `meetingsRepository` on current main — the audit verdict was right about the wrong file.
+
+#### 4. Scope declaration
+
+- Update `multicheck/details.md` "In-scope files" with the file list from Q3 **before** editing anything.
+- Expected diff size in lines (rough estimate)?
+- Anything on the list that isn't strictly needed for the goal? If yes, explain why it's in scope anyway. Reference incident: a slice silently expanded from 5 declared files to 7 committed files; caught post-facto instead of pre-commit.
+
+#### 5. Value-set parity
+
+- Does this story introduce any new enum value, status code, permission type, claim category, discriminated-union tag, or other string/symbol value? YES/NO.
+- If YES: list every LAYER where that value set is represented (DB constraint / Drizzle schema / TS union / Zod schema / exhaustive switch / OpenAPI contract / test fixtures) and confirm you will update ALL of them in THIS commit, not a follow-up. Reference incident: a SQL migration added `consultation_no_show` but the TS union in `booking.types.ts` was not updated; would have caused a runtime type mismatch; caught only by an external code-review swarm running as a third reviewer layer.
+
+#### 6. End-gate + risk
+
+- What's the exact full command the pre-commit hook runs? State it verbatim (not `--runTestsByPath` or any other subset).
+- Run it on `origin/main` RIGHT NOW and paste the baseline count (e.g. "59 suites, 700 passed, 9 skipped, 3 todo" on `<sha>`). This is what you'll diff against at `STATE: ready-for-review`.
+- What's the most likely way this story breaks in ways tests won't catch? (cross-layer drift, migration order, runtime type mismatch at a boundary, race condition, silent regression). If you can predict the "2-hours-in, I realize X" moment now, we can prevent it.
+
+### Answer format
+
+Post the pre-flight as a single `[S-NNN]` entry via heredoc. Example shape:
+
+```bash
+cat >> multicheck/agentchat.md <<'AGENTCHAT_EOF'
+
+### [S-NNN] HH:MM UTC — #<ticket> pre-flight
+STATE: building
+CLAIM: pre-flight for story #<ticket>, awaiting reviewer ack before coding
+PROOF:
+- Q1 goal fit: [G-NNN] active, CURRENT_GOAL="...", advancement="...", NON_GOAL touch=none
+- Q2 branch topology:
+    merge-base=<sha>
+    origin/main=<sha>
+    match=YES
+- Q3 file targets: <list + ls/log output>, renames=none
+- Q4 scope declaration: <file list in details.md>, ~<lines>, all necessary
+- Q5 value-set parity: none | <layer list>
+- Q6 end-gate: "<exact command>", baseline=<count> on <sha>
+- Q6 risk: <predicted failure mode>
+RISK: low | medium | high
+ASK: review
+NEXT: await [R-NNN] DECISION: accept on pre-flight before writing code
+AGENTCHAT_EOF
+```
+
+### Cost-benefit
+
+Each question that feels inapplicable to a particular story can be answered "n/a — this story doesn't touch X" in 10 seconds. The cost of an n/a answer is negligible; the cost of a missed YES answer is hours. The full pre-flight costs ~2 minutes on average. Reference sessions have seen single incidents cost 4+ hours that a one-minute Q2 check would have prevented.
+
+**Do not skip the pre-flight for "small" stories.** Small stories are exactly where operator fatigue and checklist skipping cause the most preventable failures. The pre-flight is mandatory regardless of story size.
+
+---
+
 ## STATE values
 
 - **`building`** — work in progress, no verification claim yet
