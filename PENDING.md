@@ -216,6 +216,95 @@ Catches that would have been caught by the branch-base check in the pre-period a
 
 ---
 
+### 3. Cross-layer value consistency check (§11e equivalent)
+
+- **Date queued**: 2026-04-08
+- **Source**: live `claims-monorepo` session, external `ruflo/claude-flow agent-code-review-swarm` reviewer caught what the internal reviewer and `pr.md` gates missed
+- **Proposed location**: `REVIEWER.md` "Verification recipes" section — new recipe "Cross-layer value consistency"
+- **Secondary location**: `templates/claude-md.md` top rules
+- **Severity**: high — would have caused a runtime type mismatch on a new DB enum value
+- **Metrics evidence**: see `metrics.md` row dated 2026-04-08, catch type `technical-bug`, caught by external swarm
+
+#### Incident
+
+In claims-monorepo #610, the SQL migration added a new enum value `consultation_no_show` but the corresponding TypeScript union type in `booking.types.ts` was not updated. The new value would have caused a runtime type mismatch when the DB returned the new status. Three reviewer layers ran on the PR:
+
+1. **`pr.md`** content/topology/promotion gate — passed (no slice-purity or topology violation)
+2. **Internal reviewer (primary Claude agent)** — passed (didn't check cross-layer enum/type drift explicitly)
+3. **External `ruflo/claude-flow agent-code-review-swarm`** — **caught it**
+
+The swarm's "architecture agent" persona prompts for layer violations and SOLID/DRY consistency, which primed the underlying LLM to spot the enum/type drift. The internal reviewer was looking at the slice through a different lens and missed it.
+
+#### Proposed rule text
+
+> ### Cross-layer value consistency
+>
+> When a slice introduces or load-bears any new string value (enum variant, status, role, permission, claim type), verify that EVERY layer representing the value set is consistent.
+>
+> - Grep the slice diff for new string literals matching enum-like patterns
+> - For each, find the canonical type definition (TS union, Drizzle `pgEnum`, Zod `literal` / `enum`, exhaustive switch, OpenAPI enum)
+> - Verify every layer represents the same set of values:
+>   DB constraint ↔ Drizzle schema ↔ TS union types ↔ Zod schemas ↔ exhaustive switches ↔ API contract
+> - **Fail** if any layer is missing the value
+>
+> This is a "verify one level above" check in the M1 sense: the DB change is the claim, but the claim depends on every downstream layer that represents the same values. A review that verifies the DB change alone is verifying one level deep. The cross-layer check verifies the contextual invariant.
+>
+> **Especially important when**: new enum values, new status codes, new permission types, new claim categories, or any discriminated-union tag addition. Also important after refactors that split one enum into multiple or merge multiple into one.
+
+#### Action during freeze
+
+- **Upstream `REVIEWER.md` / `templates/*`**: no change (queued here)
+- **Target project `multicheck/details.md` Active Protocol**: session-scoped bullet if the reviewer chooses
+- **Target project `pr.md` §11e**: reviewer's call (project-owned file, freeze covers upstream only)
+
+#### Fold-in plan
+
+When the freeze ends:
+
+1. Add as a new recipe in `REVIEWER.md` "Verification recipes" section
+2. Cross-reference from `templates/claude-md.md` top rules
+3. Consider whether to generalize with M1 meta-rule ("verify one level above the claim") instead of keeping as a concrete recipe — judgment call during fold-in
+
+### 4. Specialist-persona sweep (§11f equivalent)
+
+- **Date queued**: 2026-04-08
+- **Source**: live `claims-monorepo` session, reviewer's proposed addition to `pr.md` after the external swarm finding
+- **Proposed location**: `REVIEWER.md` "Hard rules" or a new "Review hats" subsection
+- **Secondary location**: `templates/claude-md.md` as a new top rule
+- **Severity**: medium — structural improvement to reviewer discipline, not tied to a specific caught bug
+- **Metrics evidence**: N/A (procedural rule, not catch-driven)
+
+#### Proposed rule
+
+The reviewer does five mandatory mini-passes through the final review target, each wearing a different hat. The reviewer must record one line of "finding-or-clean" per hat in the verdict. The point is to force a deliberate pass through five different priors, not to catch every possible defect.
+
+- **Security hat**: secrets, authn/authz boundaries, tenant isolation, input validation
+- **Performance hat**: N+1, missing indexes, sync work in async paths, unbounded queries
+- **Architecture hat**: layer violations, cross-layer consistency (ties into item #3), SOLID, dependency direction
+- **Style hat**: error handling, logging, naming, dead code
+- **Cross-layer hat**: enum/type/schema/test parity (also ties into item #3)
+
+#### Why this is different from item #3
+
+Item #3 is a concrete recipe ("when you see a new enum value, check every layer"). Item #4 is a meta-procedure ("sweep through five hats every time, one finding per hat"). The relationship: item #3 is what the "architecture hat" and "cross-layer hat" would find. Item #4 forces the reviewer to put on each hat explicitly instead of relying on whichever hat happens to be foregrounded by the current context.
+
+#### Action during freeze
+
+Same as item #3. Queue upstream, project-scoped application is reviewer's call.
+
+#### Fold-in plan
+
+This one is more ambiguous. Five mandatory passes on every verdict is a significant procedural weight. Consider whether:
+
+- (a) It becomes a hard rule in `REVIEWER.md`
+- (b) It becomes a recommended-but-optional recipe in "Verification recipes"
+- (c) It becomes an explicit section in the session-end report template (reviewer retrospectively notes which hats they wore)
+- (d) It gets deferred to Phase 2+ and replaced with an external swarm-style multi-persona tooling layer
+
+The live session data between now and unfreeze may inform which option is right. Watch whether the internal reviewer in claims-monorepo adopts the five-hat sweep organically and whether the catch rate / catch-quality changes.
+
+---
+
 ## Meta-observations
 
 Observations about patterns across queued items. Not rules themselves, but candidates for synthesized rules or architectural commentary in the unfreeze batch.
@@ -244,3 +333,43 @@ For Phase 2+ tooling considerations, consider:
 - Husky hook integration for any claims-monorepo-style project using husky
 
 Markdown discipline + automation catches what markdown discipline alone misses. The multicheck framework is Phase 1 frameworkless on purpose, but the roadmap should acknowledge this ceiling.
+
+### M3. Multi-reviewer asymmetry IS multicheck's core thesis (validated at scale)
+
+Item #3 (the cross-layer enum drift in #610) was caught by an external `ruflo/claude-flow agent-code-review-swarm` reviewer running as a THIRD reviewer layer after `pr.md` and the internal primary reviewer. This is multicheck's core thesis ("different priors catch different defects") validated at a layer above the framework itself.
+
+Multicheck's baseline is N=2 (builder + primary reviewer). The #610 finding suggests the real operational pattern is N≥3 on high-stakes promotions:
+
+- **N1**: `pr.md` content/topology/promotion gate — checks slice purity, topology, content drift
+- **N2**: Primary reviewer (the multicheck REVIEWER.md agent) — checks everything else by the reviewer's discipline
+- **N3**: External async reviewer (swarm, specialist agents) — different priors from N1 and N2, catches what they miss by virtue of asymmetry alone
+
+Each layer is weaker than the next at its primary job but stronger than the others at its specific prior. The value isn't in any single layer being better; it's in the asymmetry between layers.
+
+**Implication for multicheck upstream**: the framework currently documents N=2 (builder + reviewer). It should consider explicitly documenting the N≥3 pattern as a recommended upgrade for high-stakes projects, with the external-swarm integration as the canonical example. This is architectural commentary, not a rule — belongs in README.md next to the 3-layer architecture section.
+
+### M4. External swarm as optional third reviewer layer (Phase 2+ architectural consideration)
+
+Related to M3, but a more specific proposal: multicheck could explicitly support invoking an external code-review swarm on final promotion as part of the protocol, not as an ad-hoc addition. This would look like:
+
+- Builder posts `STATE: ready-for-review`
+- Primary reviewer runs internal verification (current Phase 1 flow)
+- **New**: primary reviewer triggers external swarm on the final PR head before accepting
+- External swarm findings become additional stipulations in the reviewer's verdict
+- The swarm output is logged alongside the reviewer's own verdict in the audit trail
+
+Candidate external swarms referenced in the reference session:
+
+- `ruflo/claude-flow agent-code-review-swarm` at `/home/xanacan/projects/code/tooling/ruflo/.agents/skills/agent-code-review-swarm/SKILL.md` — 5 personas (security, performance, style, architecture, accessibility)
+- Any other async reviewer agent with independently-prompted personas
+
+**Do NOT copy the skill file verbatim into multicheck or into target projects.** The skill is mostly CLI wiring for `npx ruv-swarm` that isn't relevant outside that ecosystem. The structural idea — "run multiple independently-prompted reviewers on high-stakes promotions" — is the transferable insight. The specific tool is one implementation.
+
+**Phase 2+ integration would require**:
+
+- A reference to the external swarm pattern in REVIEWER.md (not code)
+- A template for how the primary reviewer invokes the swarm and incorporates findings
+- An optional config in `multicheck/details.md` naming the external swarm command to invoke
+- Documentation that the three-reviewer-layer architecture is the recommended upgrade for high-stakes promotions
+
+None of this happens during the freeze. All of it is tracking for the post-freeze batch.
