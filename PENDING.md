@@ -77,3 +77,105 @@ When the freeze ends:
 2. Add a one-line cross-reference in `templates/claude-md.md` top rules: *"For cascaded stacked PRs, run diff-content check — see REVIEWER.md 'Diff-content check for cascaded files'."*
 3. Delete this queued item from `PENDING.md`
 4. The commit message should cite the incident and the metrics.md row so future operators can trace the rule back to the originating near-miss
+
+---
+
+### 2. Branch-base sanity check at slice start
+
+- **Date queued**: 2026-04-08
+- **Source**: live `claims-monorepo` session reviewer, mid-session feedback
+- **Proposed location**: `BUILDER.md` Phase 0 / slice-start section — **this is a new foundational invariant**, belongs near the top as a pre-condition for every slice, not inside the "Verification recipes" section
+- **Secondary locations**: `REVIEWER.md` Phase 0 pre-flight (reviewer verifies builder's merge-base claim), `templates/agents-md.md` and `templates/claude-md.md` top rules
+- **Severity**: high — cost 4 hours of wasted work in a real session; exposed a blind spot every existing stage 0 gate missed
+- **Metrics evidence**: see `metrics.md` rows dated 2026-04-08, catch types `near-miss` and `test-gap`
+
+#### Incident
+
+In a live session G-003 slice, the builder started work on ticket #610 by `git checkout`-ing an existing branch `calendar/cal-11-04-11-07-meeting-lifecycle-milestone` that had been created weeks earlier during G-002. They did not verify the branch base against current `origin/main`. All existing stage 0 gates passed:
+
+- **Targeted tests green** — true (tests run against the working tree, not the merge context)
+- **Husky pre-commit hook passed** — true (hook checks Prettier + contract suite, not branch topology)
+- **Gotcha checklist passed** — true (documented checklist did not include branch-base verification)
+- **Prior reviewer findings addressed** — true (builder applied `[R-034]` findings to the file they were editing)
+
+All four claims were factually correct. The builder posted `STATE: ready-for-review` in good faith. The problem was invisible until the `pr.md` audit at stage 3 computed the PR diff and surfaced the stale merge-base as a slice-purity violation:
+
+- `git merge-base HEAD origin/main` → `325095ea` (weeks-old)
+- `git rev-parse origin/main` → `10b7065c` (current)
+- PR diff contained ~20+ `.changeset/*` files plus already-merged G-002 calendar work
+
+The branch was based on a stale main from before those had landed. 4 hours of work had to be thrown out and redone on a fresh branch from current `origin/main`.
+
+**Secondary finding** (logged as separate metrics row): the reviewer's prior `[R-034]` audit had verified the right *behavior* against the *wrong file target*. The audit checked `consultation.repository.ts`, but `consultation.repository.ts` had been deleted/renamed to `meetingsRepository` between the branch base and current main. The builder caught this when a cherry-pick failed on the missing file during the rebuild. **If the builder had done fresh implementation from scratch on current main instead of checking out the stale branch, both problems would have been impossible.**
+
+#### Proposed rule text
+
+To be edited during fold-in. Reviewer's verbatim draft (paraphrased):
+
+> ### Branch-base sanity check
+>
+> Before posting `[S-NNN] STATE: building` for a new slice, verify the branch you are working on is based on current `origin/main`. The sequence:
+>
+> ```bash
+> git fetch origin
+> git rev-parse origin/main                      # current main HEAD
+> git merge-base HEAD origin/main                # base this branch is built from
+> git log --oneline origin/main..HEAD            # what's on this branch, not on main
+> git log --oneline HEAD..origin/main            # what's on main, not on this branch
+> git diff --name-only origin/main...HEAD        # three-dot: files added vs common ancestor
+> ```
+>
+> **Rule**: `git merge-base HEAD origin/main` must equal `git rev-parse origin/main` (or be within the last few commits of it, depending on how long `origin/main` has been advancing during the session). If it doesn't match, **either rebase the branch onto `origin/main` OR create a fresh branch from `origin/main`** before writing any code.
+>
+> **PROOF section of the first `[S-NNN]` entry for the slice must include**:
+>
+> ```
+> PROOF:
+> - git fetch origin: <result>
+> - git rev-parse origin/main: <sha>
+> - git merge-base HEAD origin/main: <sha>
+> - Branch base matches current main: YES | NO (with rebase plan if NO)
+> - git diff --name-only origin/main...HEAD: <file count + spot-check>
+> ```
+>
+> **Why every existing gate misses this**:
+>
+> - Targeted tests (`--runTestsByPath`) run against the working tree, not the merge context. They don't know or care what `origin/main` looks like.
+> - Pre-commit hooks check file content in isolation. They don't verify branch topology.
+> - The existing "slice-purity" verification recipe (`git diff --name-only A..B`) measures what changed between two commits but doesn't verify either commit is based on current main.
+> - PR diff / merge-base issues are only surfaced when someone computes the actual merge context — which usually happens at stage 3 (PR audit) or stage 4 (CI). By then hours of work have accumulated on the wrong base.
+>
+> **Especially important when**:
+>
+> - You are resuming work on a branch created in an earlier feature set or session
+> - The feature set branch has been sitting while other work merged to `main`
+> - A previous reviewer audit verified the file against an older main state (the audit itself can be stale-against-current-main even when the file is correct-against-old-main)
+> - File renames or deletions between branch base and current main will silently mask incorrect file targets
+
+#### Action during freeze
+
+- **Upstream `BUILDER.md` / `REVIEWER.md` / `templates/*`**: no change (queued here)
+- **Target project `CLAUDE.md` / `AGENTS.md`**: no change (Layer 2 mirrors frozen upstream)
+- **Target project `docs/review-process.md`**: **DO NOT modify during freeze.** Even though this file is project-owned and not mirrored from multicheck, adding a new stage 0 rule mid-session changes what future sessions run under, which breaks session-to-session comparability — the whole point of the freeze. The reviewer should defer this edit until the freeze ends and the upstream fold-in lands. At that point, updating `docs/review-process.md` becomes part of the unfreeze batch.
+- **Target project `multicheck/details.md` "Active Protocol" (or `specs/details.md` in legacy layout)**: **DO** add a session-scoped bullet. Example:
+  > Before posting `[S-NNN] STATE: building` for a new slice, run `git fetch && git merge-base HEAD origin/main` and verify it equals `git rev-parse origin/main`. If not, rebase or create a fresh branch from `origin/main` before writing code. Include the merge-base SHA in the PROOF section of the first slice entry. See PENDING.md item #2 in the multicheck upstream for the full incident writeup — rule will be folded upstream when the freeze ends.
+
+#### Fold-in plan
+
+When the freeze ends:
+
+1. Add the recipe to `BUILDER.md` as a new "Branch-base sanity check" section inside Phase 0 (before the message format section, since it's a pre-condition for every slice). Include the mandatory PROOF fields.
+2. Add a matching entry to `REVIEWER.md` Phase 0 pre-flight: reviewer should verify the builder's merge-base claim on the first `[S-NNN]` of each slice before accepting anything downstream.
+3. Add a one-line cross-reference in `templates/agents-md.md` top rules: *"Before `STATE: building` on any slice, run branch-base sanity check — see BUILDER.md 'Branch-base sanity check'."*
+4. Add to `templates/claude-md.md` reviewer rules: *"Verify branch-base claims on the first `[S-NNN]` of every slice."*
+5. Delete this queued item from `PENDING.md`
+6. Update `claims-monorepo/docs/review-process.md` stage 0 at the same time (operator or reviewer action, not mine)
+7. Commit message cites both metrics.md rows (the stale-branch near-miss AND the wrong-file-target audit finding) so future operators can trace the rule back to the incident
+
+#### Why this is a bigger rule than #1
+
+Item #1 (diff-content check) addresses a gap in the existing slice-purity recipe — it's a refinement of something the protocol already does.
+
+Item #2 (branch-base check) addresses a gap that **every existing stage 0 gate misses**. It's a **new foundational invariant** rather than a refinement. When folded in, it probably belongs near the top of BUILDER.md Phase 0 because it's a pre-condition for every slice, not just cascaded ones. Mentally file this as "protocol v1.x architectural addition" rather than "recipe tweak."
+
+It's also the first rule in the queue that would benefit from **automated enforcement** — a husky pre-commit hook or a git hook that runs the merge-base check on every commit would catch this before any `STATE: building` entry gets posted. That's a Phase 2+ tooling consideration, but worth noting. The markdown rule alone is not enough; the builder in the live session was entirely reasonable and still missed it because the existing checklist didn't include the check.
