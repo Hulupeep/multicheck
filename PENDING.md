@@ -179,3 +179,68 @@ Item #1 (diff-content check) addresses a gap in the existing slice-purity recipe
 Item #2 (branch-base check) addresses a gap that **every existing stage 0 gate misses**. It's a **new foundational invariant** rather than a refinement. When folded in, it probably belongs near the top of BUILDER.md Phase 0 because it's a pre-condition for every slice, not just cascaded ones. Mentally file this as "protocol v1.x architectural addition" rather than "recipe tweak."
 
 It's also the first rule in the queue that would benefit from **automated enforcement** — a husky pre-commit hook or a git hook that runs the merge-base check on every commit would catch this before any `STATE: building` entry gets posted. That's a Phase 2+ tooling consideration, but worth noting. The markdown rule alone is not enough; the builder in the live session was entirely reasonable and still missed it because the existing checklist didn't include the check.
+
+#### Local deviation applied (2026-04-08)
+
+The claims-monorepo live session reviewer chose to apply this rule at Layer 2 (project-level `docs/review-process.md`) **in addition to** Layer 3, despite the freeze recommendation to apply at Layer 3 only. Their reasoning:
+
+- `docs/review-process.md` is project-owned by the reviewer (they created it in G-003)
+- Not mirrored from multicheck upstream → not covered by the multicheck freeze
+- Layer 1 (upstream) was explicitly respected — they did NOT touch `~/projects/code/multicheck/REVIEWER.md`
+
+This is principled disagreement, not rule-breaking. The reviewer documented their choice in `[R-035]` and flagged it for the session-end report for upstream propagation. The deviation is acknowledged and logged here.
+
+**Where the rule now lives locally in claims-monorepo**:
+
+| File | Layer | Change |
+|---|---|---|
+| `specs/details.md:70` | Layer 3 (session state) | Active Protocol bullet added after the cascaded-slices rule |
+| `docs/review-process.md:51` | Layer 2 (project stable) | Stage 0 "What happens" list now leads with the topology check; "Why it matters" and "Example" sections extended with the #610 post-mortem |
+| `specs/agentchat.md [R-035]` | Audit trail | Reviewer self-correction with full incident analysis and verbatim rule text |
+
+**Data integrity implication**: claims-monorepo sessions from 2026-04-08 onward run under a different stage 0 rule set than sessions before 2026-04-08. When analyzing metrics.md for session-to-session comparability, treat claims-monorepo as having TWO protocol versions:
+
+- **pre-2026-04-08** (G-001 + G-002 + early G-003): no branch-base check at stage 0
+- **2026-04-08 onward** (late G-003 + future sessions): branch-base check at stage 0
+
+Catches that would have been caught by the branch-base check in the pre-period are valid evidence for the rule. Catches in the post-period that the branch-base check catches are evidence the rule is working. Don't cross-compare catch rates between the two periods without noting the rule set difference.
+
+**Fold-in implications**: when the freeze ends and this item gets folded upstream, the fold-in should:
+
+1. Add the rule to `BUILDER.md` / `REVIEWER.md` / `templates/*` as planned
+2. **NOT** add it to claims-monorepo's `docs/review-process.md` (already there)
+3. **NOT** add it to claims-monorepo's `specs/details.md` Active Protocol (already there; next session rotation will regenerate details.md and the rule needs to carry over)
+4. The fold-in commit message should reference the local deviation so the audit trail is complete
+
+**Freeze discipline lesson**: the freeze rules as written cover multicheck upstream and CLAUDE.md/AGENTS.md mirrors, but do NOT explicitly cover project-owned docs like `docs/review-process.md`. A strong-conviction reviewer will (reasonably) apply rules in files they own during a mid-session emergency, even when the operator requests otherwise. **For future freezes**: either tighten the rule to cover all files that govern session behavior, or accept that Layer 2 project-owned files are operator-permissive and track them with explicit "pre/post rule set" markers in metrics analysis. The current event is logged here as the first data point on this tension.
+
+---
+
+## Meta-observations
+
+Observations about patterns across queued items. Not rules themselves, but candidates for synthesized rules or architectural commentary in the unfreeze batch.
+
+### M1. Both queued rules share the same shape: "verify one level above"
+
+Items #1 (diff-content check) and #2 (branch-base check) are both instances of a deeper pattern: **the reviewer verified one level deep, missed the level above**.
+
+- Item #1: verified WHICH files changed in a cascade; missed WHETHER the file's content changed in unexpected ways
+- Item #2: verified the branch name and the tests on the branch; missed WHETHER the branch was based on current main
+
+The generalization: **for every claim, verify the claim AND the context the claim depends on.** A claim about "this file is correct" depends on "this file exists at this location on current main." A claim about "this test passes" depends on "the test is running against the correct base." The reviewer's verification recipe should always include one step above the level of the claim itself.
+
+This is a meta-rule that could become a new recipe in REVIEWER.md "Verification recipes" when the freeze ends: *"Verify the context the claim depends on, not just the claim itself. For content claims, verify file identity. For test claims, verify test context. For branch claims, verify branch base. One level above is often the silent-failure layer."*
+
+Synthesizing this meta-rule into the upstream is a judgment call for the unfreeze batch — it may be better to keep items #1 and #2 as separate concrete recipes (easier for new readers to follow) and mention the shared shape as a comment rather than folding them into a single abstract rule.
+
+### M2. Markdown rules have a ceiling of effectiveness
+
+Item #2 surfaces a real limit: the builder in the live session was entirely reasonable, had a 15+ item gotcha checklist, ran every check they knew to run — and still missed the branch-base condition because it wasn't in the playbook. Adding a 16th rule to the checklist addresses this specific gap but doesn't address the meta-problem: checklists of this size have diminishing marginal effectiveness.
+
+For Phase 2+ tooling considerations, consider:
+
+- A pre-commit hook that runs a subset of the checklist automatically (branch-base, scope, heredoc format, monotonic tags) and blocks commits that fail
+- A "stage 0 sanity script" that the builder runs once before `STATE: building` — takes 5 seconds, returns pass/fail on 10 checks
+- Husky hook integration for any claims-monorepo-style project using husky
+
+Markdown discipline + automation catches what markdown discipline alone misses. The multicheck framework is Phase 1 frameworkless on purpose, but the roadmap should acknowledge this ceiling.
