@@ -18,7 +18,9 @@ When the freeze ends, this file gets read through, each queued item is folded (o
 
 The freeze allows **partial unfreeze** for individual items when the operator judges the cost of waiting exceeds the cost of a single rule fold-in. Each partial unfreeze is documented below with rationale and commit reference, so the data-integrity impact is auditable.
 
-- **2026-04-08 — Item #5 (pre-flight questions) folded early.** Rationale: pre-flight is preventive, not reactive. Every session running without it is at direct risk of the highest-severity failure modes (stale-branch-base, wrong-file-target, silent-scope-expansion, cross-layer-drift). Items #1-#4 are reactive — they catch things during review, and the catches still land in `metrics.md` as evidence. Item #5 prevents stories from starting wrong. Folding it now costs one rule-set change in the claims-monorepo data stream but avoids the expected cost of another 4-hour stale-branch incident during the freeze window. Commit: see git log for the "freeze break for pre-flight only" commit in 2026-04-08. Items #1-#4 and the meta-observations remain queued.
+- **2026-04-08 — Item #5 (pre-flight questions) folded early.** Rationale: pre-flight is preventive, not reactive. Every session running without it is at direct risk of the highest-severity failure modes (stale-branch-base, wrong-file-target, silent-scope-expansion, cross-layer-drift). Items #1-#4 are reactive — they catch things during review, and the catches still land in `metrics.md` as evidence. Item #5 prevents stories from starting wrong. Folding it now costs one rule-set change in the claims-monorepo data stream but avoids the expected cost of another 4-hour stale-branch incident during the freeze window. Commit: `7f73c1b` 2026-04-08. Items #1-#4 and the meta-observations remained queued.
+
+- **2026-04-09 — FULL UNFREEZE, v0.5.0 release.** The data-collection freeze has ended. Rationale: the reviewer session produced a handoff document (`multicheck_upd.md`) with 4 ready-to-ship items (pre-push hook, Q7 reconnaissance, harness triage framework, gate-file template), 1 deferred prototype (propagation manifest), and closure of meta-observation M2. Holding a 4-item backlog longer while sessions continue to drift the claims-monorepo rule set would cost more than one batch fold-in. The v0.5.0 batch ships as 3 commits: (1) protocol additions markdown-only, (2) tooling hooks + templates, (3) examples + case studies. PENDING items #1-#4 remain queued because they are recipe refinements that benefit from more session data; v0.5.1 or v0.6.0 folds them along with the propagation manifest prototype. Tag: `v0.5.0`.
 
 ## Why the freeze
 
@@ -311,18 +313,20 @@ The live session data between now and unfreeze may inform which option is right.
 
 ---
 
-### 5. Six-question pre-flight before every story — FOLDED 2026-04-08
+### 5. Pre-flight before every story — FOLDED 2026-04-08, EXPANDED 2026-04-09 (v0.5.0)
 
-**Status: FOLDED into active protocol as a partial unfreeze exception.** See the "Partial unfreeze exceptions" section above.
+**Status: FOLDED into active protocol as a partial unfreeze exception on 2026-04-08 (6 questions). EXPANDED on 2026-04-09 as part of the v0.5.0 unfreeze batch to include Q7 reconnaissance.**
 
 This item is now in:
 
-- `BUILDER.md` — new "Pre-flight questions (before every story)" section between "Goal packets" and "STATE values"
-- `REVIEWER.md` — new "Pre-flight verification" section with the per-question check matrix, plus updated "When you wake" entry types
-- `templates/agents-md.md` — new rule #11 pointing to `BUILDER.md` "Pre-flight questions"
-- `templates/claude-md.md` — new rule #11 pointing to `REVIEWER.md` "Pre-flight verification"
+- `BUILDER.md` — "Pre-flight questions (before every story)" section, **now 7 questions** (Q1-Q6 as of 2026-04-08, Q7 reconnaissance added as of 2026-04-09). Also includes the "Harness-failure triage framework" section and "Dress rehearsal" note.
+- `REVIEWER.md` — "Pre-flight verification" section with per-question check matrix, plus updated "When you wake" entry types, plus "Verifying HARNESS TRIAGE blocks" subsection
+- `templates/agents-md.md` — rules #11 (pre-flight now 7 questions), #12 (harness triage), #13 (dress rehearsal)
+- `templates/claude-md.md` — rules #11 (pre-flight verification, now 7 questions), #12 (verify HARNESS TRIAGE blocks)
 
-The original queued item (format spec, incident mapping, Phase 2+ automation notes) is preserved below for historical reference but is no longer active queue content.
+Q7 reconnaissance adds the recon-before-code step that prevents harness-stubbing cascades (the `#611` pino-http / better-auth / app-factory incident chain from 2026-04-09). The harness triage framework (new section in BUILDER.md) provides the decision tree for when a harness failure IS encountered despite the recon — the 5-step "no reflexive stubbing" rule.
+
+The original queued item (6-question format spec, incident mapping, Phase 2+ automation notes) is preserved below for historical reference but is no longer active queue content. The expanded v0.5.0 version is in the active protocol files.
 
 <details>
 <summary>Original queued content (historical)</summary>
@@ -408,7 +412,23 @@ This is a meta-rule that could become a new recipe in REVIEWER.md "Verification 
 
 Synthesizing this meta-rule into the upstream is a judgment call for the unfreeze batch — it may be better to keep items #1 and #2 as separate concrete recipes (easier for new readers to follow) and mention the shared shape as a comment rather than folding them into a single abstract rule.
 
-### M2. Markdown rules have a ceiling of effectiveness
+### M2. Markdown rules have a ceiling of effectiveness — CLOSED 2026-04-09
+
+**Status: CLOSED** by the v0.5.0 release. The pre-push topology check hook (`hooks/pre-push.sh`) is the Phase 2+ automation that M2 identified as needed. It mechanically enforces the branch-base check at `git push` time, closing the gap where markdown discipline alone had reached its ceiling.
+
+Evidence supporting the close:
+
+- The 2026-04-08 session produced the original failure mode (4-hour stale-branch incident documented in metrics.md and PENDING item #2)
+- The 2026-04-09 session independently surfaced the same failure mode from a second reviewer session, with a second incident (multi-author drift on #610 slice branch from R-041) and a proposed pre-push hook implementation (ready script, 40 lines, threshold of 5 commits behind)
+- The specflow agent corrected the threshold (5 commits, not 2) based on real project churn rates
+- Both the reviewer and the specflow agent independently converged on the hook as the right fix
+
+The hook self-disables when offline (no `git fetch` available) and tolerates up to 5 commits of drift to cover release/CI chore commits. This is a narrow, well-tested mechanical enforcement of the markdown rule — not a replacement for the rule, a belt-and-suspenders for it.
+
+**Original meta-observation preserved below for historical context.**
+
+<details>
+<summary>Original M2 content (2026-04-07)</summary>
 
 Item #2 surfaces a real limit: the builder in the live session was entirely reasonable, had a 15+ item gotcha checklist, ran every check they knew to run — and still missed the branch-base condition because it wasn't in the playbook. Adding a 16th rule to the checklist addresses this specific gap but doesn't address the meta-problem: checklists of this size have diminishing marginal effectiveness.
 
@@ -419,6 +439,8 @@ For Phase 2+ tooling considerations, consider:
 - Husky hook integration for any claims-monorepo-style project using husky
 
 Markdown discipline + automation catches what markdown discipline alone misses. The multicheck framework is Phase 1 frameworkless on purpose, but the roadmap should acknowledge this ceiling.
+
+</details>
 
 ### M3. Multi-reviewer asymmetry IS multicheck's core thesis (validated at scale)
 

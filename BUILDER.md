@@ -251,6 +251,34 @@ Is `merge-base == origin/main HEAD`? YES/NO. If NO: **rebase onto `origin/main` 
 - Run it on `origin/main` RIGHT NOW and paste the baseline count (e.g. "59 suites, 700 passed, 9 skipped, 3 todo" on `<sha>`). This is what you'll diff against at `STATE: ready-for-review`.
 - What's the most likely way this story breaks in ways tests won't catch? (cross-layer drift, migration order, runtime type mismatch at a boundary, race condition, silent regression). If you can predict the "2-hours-in, I realize X" moment now, we can prevent it.
 
+#### 7. Reconnaissance (mandatory — output BEFORE answering Q1-Q6 so the other answers are grounded)
+
+Before writing any implementation code on a new story, complete reconnaissance and output it in the pre-flight packet as Q7. This step is skippable in no circumstances. Skipping it means discovering the codebase through test failures instead of before writing code.
+
+**For each file you plan to touch (editing or creating):**
+
+1. **Trace transitive imports to package boundaries.** For each file you will edit, read it and note which external packages, internal modules, and type-only imports it pulls in. For each file you will create, state which imports the file will need based on the work.
+
+2. **Survey existing tests in the same directory.** How do they run? What do they mock? What setup do they use? List at least one sibling test file path and its key mocking patterns. If the directory has no sibling tests, say so explicitly and justify why you can proceed without a reference implementation.
+
+3. **List factory/helper patterns that already exist in this workspace.** Patterns like `createApp()`, `buildServer()`, `makeClient()`, `renderWithProviders()`. For each, list the path and the use case. If you plan to create a fresh helper, explain why existing ones don't fit.
+
+4. **Identify ESM/CJS/transform boundaries in `jest.config` (or equivalent) for this workspace.** Specifically `transformIgnorePatterns` (which ESM packages does Jest need to transform?), `moduleNameMapper` (which imports are remapped?), and any `testPathIgnorePatterns` or custom `setupFilesAfterEach`. If you will import modules affected by these settings, confirm your test will work under the current config.
+
+5. **Search sibling tests in the same workspace for existing `jest.mock()` usage of your imports.** If ANY test in the workspace already mocks the packages you will use (pino-http, better-auth, logger, etc.), copy that mock pattern. Do not reinvent mocking for a package that has an established pattern in this codebase.
+
+6. **For new string literal values, enumerate the layers they must propagate to.** (This is also Q5, but Q7 forces you to enumerate BEFORE editing, while Q5 is the yes/no check.) If your implementation introduces any new enum variant, status, role, permission, claim category, or discriminated-union tag, list every layer that must represent the value set: DB constraint, Drizzle schema, TS union, Zod schema, exhaustive switches, OpenAPI contract, test fixtures.
+
+7. **For test-heavy slices, enumerate the invariant categories your test suite will prove.** Auth, authorization, parse, validation, happy-path, error-path, boundary. State which categories apply to this story and confirm your test list covers each applicable category. This replaces a separate Q8 proposed earlier — the enumeration belongs here because it's grounded in the recon you just did.
+
+**Why this is mandatory.** The LLM's default is to write code, hit failures, and patch symptoms. Three types of failures this section prevents:
+
+- **Harness stubbing cascades** — discovering a dependency can't be imported in tests, stubbing it reflexively, discovering another dependency, stubbing it, etc. (Reference: `#611` pino-http + better-auth stubbing chain.)
+- **Missing factory patterns** — writing a test that can't cleanly exercise the real code surface because no factory exists, then having to refactor product code mid-slice. (Reference: `#611` app-factory refactor that should have been declared upfront.)
+- **Cross-layer value drift** — introducing a new enum value in one layer without updating others. (Reference: `#610` `consultation_no_show` missing from TypeScript union, caught only by external swarm reviewer.)
+
+Recon costs ~3 minutes of tool calls. It prevents 30+ minutes to several hours of trial-and-error patching per failure.
+
 ### Answer format
 
 Post the pre-flight as a single `[S-NNN]` entry via heredoc. Example shape:
@@ -272,6 +300,14 @@ PROOF:
 - Q5 value-set parity: none | <layer list>
 - Q6 end-gate: "<exact command>", baseline=<count> on <sha>
 - Q6 risk: <predicted failure mode>
+- Q7 reconnaissance:
+    imports: <transitive imports per file>
+    sibling tests: <paths + mocking patterns>
+    existing factories: <createApp/buildServer/etc. + why (not) reused>
+    jest/esm boundaries: <transformIgnorePatterns/moduleNameMapper findings>
+    sibling mocks: <existing jest.mock patterns in workspace for these imports>
+    propagation layers: <if Q5 is YES, enumerated layers>
+    invariant categories: <auth/authz/parse/validation/happy/error/boundary coverage>
 RISK: low | medium | high
 ASK: review
 NEXT: await [R-NNN] DECISION: accept on pre-flight before writing code
@@ -283,6 +319,64 @@ AGENTCHAT_EOF
 Each question that feels inapplicable to a particular story can be answered "n/a — this story doesn't touch X" in 10 seconds. The cost of an n/a answer is negligible; the cost of a missed YES answer is hours. The full pre-flight costs ~2 minutes on average. Reference sessions have seen single incidents cost 4+ hours that a one-minute Q2 check would have prevented.
 
 **Do not skip the pre-flight for "small" stories.** Small stories are exactly where operator fatigue and checklist skipping cause the most preventable failures. The pre-flight is mandatory regardless of story size.
+
+---
+
+## Harness-failure triage framework
+
+When a test fails for harness reasons — not a product bug, but the test can't run because of an import failure, a missing mock, a type mismatch at the test boundary, or similar — you MUST triage the failure before patching it.
+
+### Rule: no reflexive stubbing
+
+Before adding a `jest.mock()`, a `sinon.stub()`, or any test-boundary override, work through this triage:
+
+1. **Is there an existing factory or helper in the workspace that already solves this?**
+   - Grep for `createApp`, `buildServer`, `makeClient`, `renderWithProviders` (or equivalent for your stack)
+   - If yes, use it. Stop.
+
+2. **Does any other test in the workspace already handle this import with a specific mock pattern?**
+   - Grep for `jest.mock.*<package name>` across sibling tests
+   - If yes, copy the pattern. Stop.
+
+3. **Is the harness issue symptomatic of a product-code shape problem that SHOULD be fixed?**
+   - Example: a module that imports heavy side-effect dependencies at the top level when it could expose a lazy factory
+   - Example: a logger singleton that couples the test to a specific logger implementation
+   - If yes, propose a minimal product-code refactor BEFORE writing the test. Declare the refactor in the pre-flight scope amendment and run the reviewer ack for the expanded scope. Then write the test.
+
+4. **Is the test at the wrong boundary?**
+   - A unit test trying to exercise integration behavior will hit integration-level harness issues
+   - Move the test to the right boundary (e.g., functional test with a real Express mount) instead of stubbing everything around a unit
+
+5. **Only if 1-4 all say "no" and you have explicitly considered each one:** add the test-boundary stub, and include in the stub's comment WHY it exists — specifically which of the 1-4 options you ruled out and why.
+
+### Required output format
+
+When you encounter a harness issue and triage it, include this block in your next `[S-NNN]` entry:
+
+```
+HARNESS TRIAGE:
+- failure: <the exact error message or missing-import>
+- root cause: <your understanding of WHY it fails>
+- option 1 (existing factory/helper): considered / not applicable — <reason>
+- option 2 (sibling test mock pattern): considered / not applicable — <reason>
+- option 3 (product-code refactor): considered / not applicable — <reason>
+- option 4 (different test boundary): considered / not applicable — <reason>
+- chosen: <option number + reason>
+- implications for future tests: <will future tests need the same stub? are we accumulating entanglement?>
+```
+
+This prevents reflexive stubbing. The builder must consciously choose between stub-locally (Band-Aid) and fix-the-pattern (durable). The output is a ledger entry, so the reviewer can verify the triage was done and the choice was reasoned.
+
+### Reference incidents
+
+- `#611` pino-http stubbing and better-auth stubbing, 2026-04-09 session: reflexive stubbing was the first reflex; the correct option (app-factory refactor) was the third choice after two rounds of patching. The triage framework would have produced the correct option on the first round.
+- `#611` draft swarm finding on missing app-mount test, 2026-04-09: the external swarm reviewer caught that stubs alone couldn't prove the real auth boundary. The triage framework's option 3 (product-code refactor) is exactly what the builder ended up doing, but it came after the swarm finding rather than from the builder's own triage.
+
+### Dress rehearsal
+
+Before the first `git commit` attempt on a slice, consider running the pre-commit script directly against your staged files as a dry-run. This catches Prettier and contract-scan failures at the cheap moment (before typing `git commit`) rather than at the expensive moment (after typing it). Repeated Prettier stops in a single session are a signal that the builder is treating commit as their first test run. If your project uses husky, the script is typically at `.husky/pre-commit` — run it directly with `sh .husky/pre-commit` or the equivalent.
+
+Reference: five Prettier stops observed in a single session during `#611` work, 2026-04-09. All would have been caught by a pre-commit dry-run.
 
 ---
 

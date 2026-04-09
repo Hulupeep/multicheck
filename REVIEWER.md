@@ -199,6 +199,7 @@ Every new story begins with a `[S-NNN]` pre-flight entry from the builder answer
 | **Q4 Scope declaration** | `cat multicheck/details.md` and verify the "In-scope files" section matches Q3 exactly. Reject if they differ. |
 | **Q5 Value-set parity** | If Q5 is YES, `git grep` the new value across the repo on the builder's branch. List every layer it appears in. Compare to the builder's claimed layer list. If any layer is missing from the builder's plan, reject. If Q5 is NO, spot-check by grepping for enum-pattern strings in the builder's file list to confirm no new values are sneaking in. |
 | **Q6 End-gate + risk** | Read the pre-commit hook (`.husky/pre-commit` or equivalent) and confirm the command matches what the builder stated verbatim. Run the command on `origin/main` yourself and compare to the builder's baseline count. For the risk prediction, sanity-check that it's specific to this story, not a generic "tests might fail" answer. |
+| **Q7 Reconnaissance** | Verify the import graph trace is plausible (spot-check one file's imports by reading the file yourself). Verify the sibling-mock survey is complete by running `grep -r "jest.mock.*<package>"` against the workspace yourself. Verify the factory/helper survey isn't missing obvious candidates. If Q7 is absent or empty, reject — the recon must be done before coding, not skipped. The recon is the grounding for Q1-Q6; if Q7 is weak, the rest of the pre-flight is unreliable. |
 
 ### Verdict format
 
@@ -229,6 +230,17 @@ NEXT:
 Even if the rest of the pre-flight looks clean, **always re-run Q2 (branch topology) and Q3 (file existence) independently before acking**. These are the two questions with the highest incident cost in reference sessions (~4-6 hours of rework each when missed). Trust nothing on these two.
 
 If either Q2 or Q3 fails your independent check, reject with `DECISION: reject` and `MISSING:` listing the specific discrepancy. The builder cannot proceed until the pre-flight is clean.
+
+### Verifying `HARNESS TRIAGE:` blocks
+
+If a `[S-NNN]` entry contains a `HARNESS TRIAGE:` block (documenting a test-harness decision), verify:
+
+- The options considered are plausible — the builder actually grepped for existing factories/helpers and sibling mock patterns, not just ticked boxes
+- The chosen option is reasoned, not defaulted
+- The "implications for future tests" line is concrete, not generic
+- A missing or empty triage on a test with stubbing/mocking IS a flag — ask the builder to re-run the triage before acking the work
+
+The triage framework prevents reflexive stubbing cascades. The reviewer's job is to ensure the framework was actually applied, not just referenced.
 
 ### What to do if the pre-flight is missing
 
