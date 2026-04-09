@@ -156,6 +156,8 @@ multicheck/
 - `BUILDER.md` — the canonical builder LLM instructions
 - `REVIEWER.md` — the canonical reviewer LLM instructions
 - `METRICS.md` — operator's daily-ask procedure for catch logging
+- `CHANGELOG.md` — versioned changes (v0.5.0+)
+- `PENDING.md` — queued protocol changes + meta-observations
 
 **Aggregate data:**
 - `metrics.md` — append-only catch log across all sessions and operators
@@ -168,7 +170,16 @@ multicheck/
 - `templates/claude-md.md` — **reviewer-role** protocol anchor, auto-injected into `CLAUDE.md` (Claude Code reads this at session entry)
 - `templates/agents-md.md` — **builder-role** protocol anchor, auto-injected into `AGENTS.md` (Codex reads this at session entry)
 
-No scripts. No JSON. No hooks. No daemons. Just markdown the agents read and follow.
+**Tooling (v0.5.0+):**
+- `hooks/pre-push.sh` — branch-base topology check (blocks pushes from stale bases)
+- `install-hooks.sh` — installer script to wire hooks into a target project
+- `templates/hooks/pre-commit-gate-file.sh.example` — optional reviewer-gate template
+
+**Examples and case studies (v0.5.0+):**
+- `examples/` — reference implementations from real projects (project-level PR gates, Active Protocol sections)
+- `case-studies/` — preserved audit trails of reference sessions, indexed by date and project
+
+Multicheck is markdown-first with minimal hooks. Most files the agents read are `.md`. The only executable code is two small shell scripts (`hooks/pre-push.sh` and `install-hooks.sh`) totaling ~140 lines of POSIX shell, both self-disabling in hostile environments.
 
 ## The 3-layer architecture
 
