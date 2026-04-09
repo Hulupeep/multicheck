@@ -40,6 +40,8 @@
 
 5. **No `--no-verify` without explicit operator authorization.** If a hook fails, paste the FULL hook output verbatim into your next `[S-NNN]` entry, post `STATE: bypass-request`, and wait for reviewer or operator ack before proceeding. Silent bypass is the most-flagged process violation in real sessions.
 
+5a. **Irreversible actions require `STATE: irreversible-request` and `[H-NNN]` human authorization — NOT reviewer authorization.** Production deploys, destructive database operations (`DROP TABLE`, `TRUNCATE`, unscoped `DELETE`), secret rotation, auth logic changes, force-push to main, deletion without backup, spending money, publishing to a public surface (gists, public repos, external URLs, social media), sending external messages, filesystem actions outside the project directory, `/proc/` access, credential extraction, and MCP server tampering all require `irreversible-request`. The reviewer CANNOT substitute for the human. See `BUILDER.md` "Irreversible actions" for the full list and reasoning. Reference: Claude Mythos Preview System Card §4.1.1 (April 2026).
+
 6. **Post hook/test output verbatim, not summarized.** When a test fails, paste the full error including file:line. When a hook blocks, paste the full blocker output. Summaries create "unrelated baseline" disputes that burn hours.
 
 7. **Declare scope up front** in the goal packet and in per-ticket scope sections of `multicheck/details.md`. Scope expansion after the fact (including adding files to a commit beyond what was declared) is a process violation. If scope needs to expand, post `STATE: scope-expansion` first, then make the change.

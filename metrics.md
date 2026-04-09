@@ -28,6 +28,8 @@ If you are an operator who wants to add your session's catches, see the "Sharing
 
 Severity: `low` | `medium` | `high` | `critical`. Caught by: `builder` | `reviewer` | `operator` | `hook` (as of v0.5.0 — mechanical catches by `hooks/pre-push.sh` or similar).
 
+**Model tracking (as of v0.5.1):** new rows should include `Builder model` and `Reviewer model` columns. Existing rows may be backfilled where the pairing is known. The reference session pairing for all rows dated 2026-04-06 through 2026-04-09 is `codex-gpt-5` builder + `claude-opus-4.6` reviewer unless otherwise noted.
+
 ---
 
 ## Catches

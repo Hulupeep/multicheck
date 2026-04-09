@@ -105,8 +105,29 @@ Pre-existing failures discovered later become disputes that burn hours.
 - [ ] End-gate command passes (full, not subset)
 - [ ] Tests pass against production (if applicable)
 - [ ] Real user flow verified, DB rows confirmed (if applicable)
+- [ ] Evals pass (if declared — see Evals section below)
 - [ ] Reviewer signed off in agentchat.md
 - [ ] gh issue comment posted with proof and timestamp
+
+## Evals
+<!--
+Optional. For complex logic where unit tests are insufficient, list custom evals that prove
+the slice is done. Evals are project-owned — multicheck just has a slot for them.
+
+An eval is a custom verification script that probes a specific behavior. Examples:
+- A script that replays a known production incident and confirms the fix prevents recurrence
+- A probabilistic check that runs a classifier against 100 inputs and confirms 95%+ correct
+- A differential test that compares the new implementation's output against the old one
+  across a fixed corpus
+- A long-running test that exercises a code path under memory pressure
+
+Evals become more valuable as builder model capability increases — unit tests catch what they
+were written to catch; evals catch what you actually care about.
+-->
+- Eval name: <path to eval script>
+  - What it tests: <one-line description>
+  - Pass criteria: <specific output that proves done>
+  - Run command: <exact command the reviewer will run>
 
 ## Open blockers / human authorization required
 <!-- Any item that requires the human operator. Be explicit. -->

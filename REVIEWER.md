@@ -259,7 +259,8 @@ You wake when your operator types something. The instant you wake:
    - **Pre-flight entry** (builder's first `[S-NNN]` for a new story, containing the 6 Q&A) — verify each answer independently per the "Pre-flight verification" section above. Q2 (branch topology) and Q3 (file existence) MUST be re-run from your own shell, never trusted on paste. Accept or reject.
    - **`ASK: review`** — verify (against the active goal packet AND against the technical claim) and post a decision
    - **`STATE: ready-for-review`** — verify (end-gate first) and post a decision. Also verify a pre-flight entry exists earlier in the chat for this story; if not, reject on missing-pre-flight grounds.
-   - **`STATE: bypass-request`** — post a decision, or escalate to human if it requires authorization beyond your scope
+   - **`STATE: bypass-request`** — post a decision, or escalate to human if it requires authorization beyond your scope. **If the bypass is actually irreversible, reject and require the builder to re-post as `STATE: irreversible-request`.**
+   - **`STATE: irreversible-request`** — DO NOT authorize. Reviewer ack is insufficient for irreversible actions per `BUILDER.md` "Irreversible actions" section. Verify the builder has correctly classified the action as irreversible (blast radius described, rollback plan says "NONE POSSIBLE"), then defer to the human operator by posting `[R-NNN] DECISION: needs-more-proof WHY: irreversible action, awaiting [H-NNN]`. Do NOT approve with `accept` — only the human `[H-NNN] DECISION: irreversible-authorized` clears this gate.
    - **`STATE: archive-request`** — verify nothing in flight would be lost (see "Archive request handling" below). Accept or reject.
    - **`STATE: scope-expansion`** — verify the new file list against `details.md`, accept or reject
    - **`STATE: self-correction`** — accept positively and increment your self-correction counter
@@ -339,8 +340,9 @@ For every builder claim, work through this order. Stop at the first failure and 
 5. **Deployment status** — is the deploy live and READY?
 6. **Production URL** — does the live surface respond as expected?
 7. **Database truth** — do the rows exist that the real flow should have written?
+8. **Evals** — if the target project has declared evals in `multicheck/details.md` "Evals" section, run them and verify they pass. Include the eval output in `INDEPENDENT VERIFICATION:` in your verdict. Evals are project-owned — multicheck provides the slot, the project provides the eval scripts. For slices where evals are declared but not run, reject with `MISSING: eval output`.
 
-A claim accepted at step 4 without ever reaching step 7 is fine for code-only changes. A claim accepted at step 4 for a feature that should write to the DB is incomplete.
+A claim accepted at step 4 without ever reaching step 7 is fine for code-only changes. A claim accepted at step 4 for a feature that should write to the DB is incomplete. A claim accepted at step 7 without reaching step 8 is incomplete if evals are declared — the declared evals ARE part of the Definition of Done.
 
 ---
 

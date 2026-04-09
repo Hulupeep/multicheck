@@ -32,9 +32,11 @@ Operators may periodically PR their session catches back upstream into this repo
 
 Every row is one catch. The columns are:
 
-| Date | Catch type | Severity | Caught by | Description | Evidence |
-|---|---|---|---|---|---|
-| 2026-04-07 | process-violation | high | reviewer | builder used --no-verify on commit 58327df without prior bypass-request | [R-006], commit 58327df |
+| Date | Catch type | Severity | Caught by | Builder model | Reviewer model | Description | Evidence |
+|---|---|---|---|---|---|---|---|
+| 2026-04-07 | process-violation | high | reviewer | codex-gpt-5 | claude-opus-4.6 | builder used --no-verify on commit 58327df without prior bypass-request | [R-006], commit 58327df |
+
+The `Builder model` and `Reviewer model` columns were added in v0.5.1 to enable capability-correlation analysis. Rows from before v0.5.1 do not have these fields populated; they can be backfilled when known. The current recommended pairing is noted in the legend.
 
 ### Date
 
@@ -69,6 +71,22 @@ ISO date `YYYY-MM-DD`. UTC.
 - **`reviewer`** — for everything else that a human-ish reviewer found. Includes findings in the builder's work OR in its own draft.
 - **`operator`** — rare. The human operator caught something neither agent did. Counts as an anti-pattern (means the protocol missed it) but should still be logged.
 - **`hook`** — a git hook or other automated check blocked the bad state mechanically. Examples: `hooks/pre-push.sh` blocks a stale-base push; `templates/hooks/pre-commit-gate-file.sh.example` blocks a commit missing reviewer clearance. Hook catches are valuable data — they show automation closing the markdown-discipline ceiling — and should be logged with the hook name and commit SHA (or push attempt) as evidence.
+
+### Builder model / Reviewer model
+
+Exact model and provider string. Examples:
+
+- `codex-gpt-5` (OpenAI Codex CLI)
+- `claude-opus-4.6` (Claude Code)
+- `claude-mythos-preview` (Claude Mythos Preview, limited access via Project Glasswing)
+- `claude-sonnet-4.6`
+- `claude-haiku-4.5`
+- `gemini-2.5-pro`
+- `unknown` — use only when the operator didn't record it; avoid if possible
+
+The pairing matters. Same-model pairs (e.g. `claude-opus-4.6 / claude-opus-4.6`) lose most of the asymmetric-blind-spots advantage. Different-model pairs (e.g. `codex-gpt-5 / claude-opus-4.6`) are the recommended configuration. Mixed-capability pairs (e.g. `claude-mythos-preview / claude-opus-4.6`) are the emerging frontier — the stronger model as builder, the older model as reviewer provides catches the stronger model alone would miss.
+
+Recording the pairing on every row enables later analysis: "Does a Mythos-class builder produce fewer technical-bug catches but the same number of process-violation catches? Does same-model pairing drop self-correction rates?"
 
 ### Description
 

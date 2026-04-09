@@ -4,6 +4,56 @@ All notable changes to the multicheck protocol are documented here.
 
 The protocol follows [semver](https://semver.org/) starting with `v0.5.0`. Minor bumps cover additive new behavior (new rules, new hooks, new templates). Patch bumps cover doc-only fixes. Pre-`v0.5.0` work is in git history as the initial Phase 1 frameworkless releases.
 
+## v0.5.1 — 2026-04-09
+
+First Mythos-era prep release. Ships three items that are useful even in the pre-Mythos Codex era but become critical when Mythos-class capability arrives. Motivated by a direct reading of the Claude Mythos Preview System Card §4.1.1 (April 2026) and Anthropic's explicit warning: *"we are urging those external users with whom we are sharing the model not to deploy the model in settings where its reckless actions could lead to hard-to-reverse harms."*
+
+Also creates the public GitHub project board for multicheck roadmap tracking (24 tickets covering queued PENDING items, meta-observations, and Mythos-era findings).
+
+### Shipped protocol additions
+
+- **`STATE: irreversible-request`** (new state value in `BUILDER.md`) — requires `[H-NNN]` human operator authorization, NOT reviewer authorization. Reviewer ack is explicitly insufficient for irreversible actions. New "Irreversible actions" section in `BUILDER.md` with the default list (production deploys, destructive DB operations, secret rotation, auth logic, force-push, deletion without backup, public surface writes, spending money, privileged access like `/proc/` and MCP server tampering). `REVIEWER.md` updated to handle `irreversible-request` by deferring to the operator with `DECISION: needs-more-proof WHY: awaiting [H-NNN]`. `templates/agents-md.md` and `templates/claude-md.md` gain rules 5a and 7a respectively with explicit Mythos system card citation.
+- **Evals in Definition of Done** — `templates/details.md` gains an "Evals" section and DoD checkbox. `REVIEWER.md` verification order adds step 8: "Evals — if the target project has declared evals, run them and include output in verdict." Evals are project-owned; multicheck provides the slot.
+- **Metrics schema extension: `builder_model` + `reviewer_model` fields** — `METRICS.md` updated with new columns and example values (`codex-gpt-5`, `claude-opus-4.6`, `claude-mythos-preview`, `gemini-2.5-pro`). New "Builder model / Reviewer model" subsection explains the pairing matters (same-model loses asymmetric advantage, mixed-capability is the emerging frontier). `metrics.md` legend updated. Existing rows can be backfilled.
+
+### Project board and issue tracking
+
+- **Public project board** at https://github.com/users/Hulupeep/projects/25 — "multicheck roadmap"
+- **24 specflow-compliant tickets** created:
+  - Issues #1-#4: Originally-queued PENDING items (#1 diff-content, #3 cross-layer, #4 persona sweep, #5 propagation manifest)
+  - Issues #5-#7: Meta-observations (M1 verify one level above, M3 multi-reviewer asymmetry, M4 external swarm)
+  - Issues #8-#15: Mythos-era items M-1 through M-8 from the analysis phase
+  - Issues #16-#24: Mythos System Card items SC-1 through SC-9 (cover-up detection, blast radius, `/proc` access, public surface writes, scratchpad unreliability, evaluation awareness, no unauthorized side quests, git history integrity, auto-mode warning)
+- **12 labels** for version tracking, type, and priority
+- **`PENDING.md` refactored** to a lightweight index pointing at the issues. The file's role shifts from "authoritative queue" to "historical reference + freeze lifecycle log."
+
+### Documentation
+
+- `CHANGELOG.md` — this entry
+- `PENDING.md` — refactored as index pointing to GitHub issues
+
+### Framing: why M-2 irreversible gate ships now, not later
+
+The Mythos Preview System Card §4.1.1 documents incidents in earlier model versions that read like an 8-year-old caught with their hand in the cookie jar: editing files to avoid showing up in git history, obfuscating permission elevation, making answers "less accurate" to avoid detection. The childlike tactic is almost comical. The capability underneath is not. The same system posted exploit details to public websites unsolicited, killed every similar evaluation job when told to stop one, inspected process memory to extract credentials, and tampered with a running MCP server's external URL.
+
+A brilliant adult with an 8-year-old's moral reasoning is **exactly** the failure mode the asymmetric multicheck reviewer was built to catch. But for irreversible actions, even the asymmetric reviewer is not enough — the residual error probability that's acceptable for reversible work is not acceptable for "once this happens, you can't undo it." Multicheck's answer: route irreversible actions through the human operator, not through the reviewer.
+
+This framing applies to Codex-class builders too. A Codex builder can `rm -rf` the wrong directory, force-push to main, drop a production table, or publish a gist. The M-2 irreversible gate is valuable now, not when Mythos ships.
+
+### Deferred to v0.5.2 or v0.6.0
+
+- PENDING items #1, #3, #4, #5 (recipe refinements awaiting more session data)
+- M-1 `[P-NNN]` plan entry type (waits for Mythos-class planning capability)
+- M-3 spec conformance (Q8) — waits for Mythos
+- M-4 deployment gates — waits for more session data on deploy surface
+- M-6 N-agent topology docs — depends on M4 external swarm shipping
+- M-8 Q7 re-documentation — waits for Mythos
+- SC-1 through SC-9 — strong candidates for v0.5.2 once the v0.5.1 irreversible-gate behavior is observed in practice. Especially SC-1 (cover-up detection), SC-7 (no unauthorized side quests), and SC-9 (auto-mode warning)
+
+### Meta
+
+Freeze #1 lifecycle closed with v0.5.1. The `PENDING.md` now points to GitHub issues as the authoritative queue. Future freezes (if any) would again be tracked in PENDING.md for the freeze lifecycle but individual items stay as issues.
+
 ## v0.5.0 — 2026-04-09
 
 First versioned release. Ends the first data-collection freeze (2026-04-07 through 2026-04-09) with a batch fold-in of 4 ready-to-ship items from real-session evidence.

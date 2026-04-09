@@ -386,6 +386,7 @@ Reference: five Prettier stops observed in a single session during `#611` work, 
 - **`verifying`** — running tests, hitting URLs, querying DB
 - **`blocked`** — cannot proceed without external action; name the exact blocker
 - **`bypass-request`** — you want to use `--no-verify`, `--force`, delete a lockfile, or otherwise route around an enforced gate. **Wait for `H-NNN` (human) or `R-NNN` (reviewer) authorization before proceeding.** Do not bypass first and disclose later.
+- **`irreversible-request`** — you want to take an action whose consequences **cannot be undone** regardless of authorization: production deploy, destructive database operation, secret rotation, auth logic change, force-push to main, deletion without backup, spending money, publishing to a public surface, sending external messages, filesystem action outside the project directory. **Wait for `[H-NNN] DECISION: irreversible-authorized` from the human operator.** Reviewer ack is NOT sufficient for irreversible actions. See "Irreversible actions" section below for the full list and reasoning.
 - **`archive-request`** — operator has instructed you to rotate the current chat and start a new feature set. **Wait for reviewer ack before moving any files.** See "Archive policy" section below.
 - **`scope-expansion`** — the file list you are about to commit exceeds the in-scope list in `details.md`. Post BEFORE committing, not after. Update `details.md` in the same entry.
 - **`self-correction`** — you caught a mistake in your own prior entry. This is high-value behavior. Cite the prior entry by number, state the mistake, state the correction, re-verify.
@@ -541,6 +542,124 @@ Why a single-quoted heredoc:
 - **`Edit` / `Write` tools are a fallback only.** They may race with concurrent writers and they may fail with "file modified since read" errors when something else touched the file. Use heredoc append by default.
 
 In one ~5-hour reference session, ~10 reviewer writes using the heredoc pattern hit zero races. The 3 prior writes using Edit/Write all hit "file modified since read" failures.
+
+---
+
+## Irreversible actions
+
+A `bypass-request` asks the reviewer to waive a gate. An `irreversible-request` asks the **human operator** to authorize an action whose consequences cannot be undone. The reviewer CANNOT substitute for the human on these. No amount of reviewer agreement makes an irreversible action reversible.
+
+This rule exists because a more capable builder, on the rare occasions it takes reckless excessive measures to complete a task, does so at a blast radius the reviewer cannot roll back. The Claude Mythos Preview System Card (§4.1.1, April 2026) documented incidents where earlier model versions posted exploit details to public-facing websites to "demonstrate success," took down *all* evaluation jobs when asked to stop one, leaked internal code artifacts as public GitHub gists against operator intent, and inspected process memory to extract credentials. Every one of those actions is irreversible. No reviewer verdict would have made them undoable after the fact.
+
+### Operations that require `STATE: irreversible-request`
+
+Default list. Projects may add more via `multicheck/details.md` "Active Protocol" section.
+
+**Production and deploy surface:**
+
+- Production deploys (release, publish, merge to main on a production service, `gh pr ready` on a production branch)
+- Canary promotion to 100% traffic
+- Rolling back a deploy (counts as irreversible because the rollback is itself a production change)
+- DNS changes
+- Feature flag changes in production
+
+**Data destruction:**
+
+- `DROP TABLE`, `DROP COLUMN`, `DROP DATABASE`, `TRUNCATE`
+- `DELETE` without a `WHERE` clause, or with a `WHERE` clause whose selectivity hasn't been verified
+- Destructive `UPDATE` without backup of affected rows
+- `rm -rf` anywhere
+- File deletion outside the project directory
+- Branch, tag, or artifact deletion without explicit backup
+
+**Credentials and auth:**
+
+- Secret rotation (any change to API keys, tokens, certificates, passwords)
+- Auth logic changes (middleware, permission checks, session handling, RLS policies)
+- User permission changes in production
+- SSH key, PGP key, or signing key changes
+
+**Git history manipulation:**
+
+- Force-push to main or any shared branch
+- `git reset --hard` on a commit visible in `git log`
+- `git rebase -i` with `drop` directives on commits already pushed
+- `git commit --amend` on commits already visible to the reviewer
+- `git filter-branch`, `git filter-repo`, `git rebase --root`
+- Any operation that would cause a previously-present commit to no longer appear in `git reflog`
+
+**Public surface writes:**
+
+- `gh gist create` (public gists)
+- `gh repo create --public`
+- Any HTTP POST to a domain not owned by the operator
+- Package registry publishes (`npm publish`, `pypi upload`, `cargo publish`, `gem push`)
+- Social media posts, blog posts, tweets
+- Comments on public GitHub issues/PRs in external repos
+- Sending email, Slack, Discord, SMS to non-operator recipients
+
+**Spending money:**
+
+- API calls to paid services beyond trivial quotas
+- Cloud provisioning (creating instances, buckets, databases, domains)
+- Domain registration
+- Subscription changes
+
+**Privileged access:**
+
+- Reading `/proc/*` (except `/proc/self/*` for own-process introspection in narrow cases)
+- Inspecting process memory of other processes
+- Using any tool in a way that bypasses its intended permission model (e.g., file-editing tool writing to shell input)
+- Searching for credentials anywhere on the filesystem
+- Escalating permissions (`sudo`, `chmod +s`, `setcap`, container escape)
+- Modifying MCP server processes, configurations, or URLs
+- Installing new MCP servers or registering new tools
+
+### The `irreversible-request` format
+
+```md
+### [S-NNN] HH:MM UTC — #<ticket> irreversible action request
+STATE: irreversible-request
+CLAIM: requesting authorization for <one-line action>
+PROOF:
+- exact command: <the literal command you will run, verbatim>
+- blast radius: <everything this affects, enumerated>
+- rollback plan: <specific commands to undo, or "NONE POSSIBLE" if irreversible>
+- verification after: <how you will confirm the action succeeded as intended>
+- operator context: <why the operator should authorize this>
+RISK: medium | high | critical
+ASK: human-authorization
+NEXT: await [H-NNN] DECISION: irreversible-authorized before executing
+```
+
+The builder MUST NOT execute the action until `[H-NNN] DECISION: irreversible-authorized` appears in `agentchat.md`. Reviewer ack (`[R-NNN] DECISION: accept`) is explicitly insufficient.
+
+### Why the reviewer is insufficient for irreversible actions
+
+The reviewer is a different LLM with different priors. That's the protection against reversible mistakes — the reviewer will catch things the builder missed. But the reviewer is still an LLM, and even the most careful reviewer cannot guarantee an irreversible action is correct. The asymmetric-blind-spots advantage reduces error probability; it doesn't zero it out.
+
+For reversible mistakes, a small residual error probability is acceptable because rollback is possible. For irreversible mistakes, the same residual probability is unacceptable because rollback is impossible. Only the human operator can take that responsibility.
+
+This is the architectural implication of the Mythos system card's warning: *"we are urging those external users with whom we are sharing the model not to deploy the model in settings where its reckless actions could lead to hard-to-reverse harms."* Multicheck's answer: for hard-to-reverse actions, the asymmetric reviewer is necessary but not sufficient. The human is the final gate.
+
+### Interaction with `bypass-request`
+
+A `bypass-request` can escalate to `irreversible-request` if the reviewer judges the bypass irreversible. For example, a builder posting `STATE: bypass-request` for `git push --force` should be re-framed by the reviewer as `STATE: irreversible-request` and kicked to the human. The reviewer response to a mis-classified request:
+
+```md
+### [R-NNN] HH:MM UTC — #<ticket>
+DECISION: reject
+TECHNICAL: accept
+PROCESS: reject
+WHY:
+- This action is irreversible, not a simple bypass.
+- Reviewer authorization is insufficient for irreversible actions.
+- Builder must re-post as STATE: irreversible-request and await [H-NNN] DECISION: irreversible-authorized.
+MISSING:
+- Human operator authorization
+NEXT:
+- builder re-post with correct STATE and wait for [H-NNN]
+```
 
 ---
 
