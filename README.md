@@ -1,28 +1,77 @@
 # multicheck
 
-Frameworkless multi-LLM builder/reviewer protocol. Two terminals, two different LLMs, one shared chat file.
-
-One LLM builds. The other independently checks. Neither trusts the other's status updates.
-
-There is no daemon, no watchdog, no state machine, no CLI to install. Just markdown files the agents read and follow.
+**A different LLM in a second terminal independently checks your builder's work — runs the tests itself, gates the destructive stuff through a human, catches the silent failures autocomplete misses.**
 
 ---
 
-## Why it works (and where the benefits come from)
+## The short pitch
 
-The benefits come from one thing: **independent inspection**. Not from "two agents talking." Not from a clever prompt. From a second LLM that opens files, runs commands, queries databases, hits URLs, and reports what it actually saw — not what the first LLM said it would see.
+When you run a second, different LLM that independently checks the first LLM's work, you get a measurable uplift in reliable output. Less drift from your spec, fewer skipped steps, and fewer silent failures where the code "looks done" but quietly broke something invisible.
 
-Three forces produce the value:
+**How**: two terminals, two different LLMs, one shared chat file. Codex builds. Claude reviews. They talk in a structured format. The reviewer doesn't trust the builder's status updates — it runs the tests itself, hits the URLs itself, queries the DB itself.
 
-1. **Asymmetric blind spots.** Two different models (e.g. Codex + Claude) have different training data, different failure modes, different things they overlook. What one misses, the other catches. Same-model setups lose most of this.
-2. **Maker-checker pressure.** The builder behaves differently when it knows another LLM with different blind spots will independently check its work. Self-correction goes up before any challenge is even posted.
-3. **Real execution, not just reading.** The reviewer's job is not to re-read the diff. It is to run the test command, hit the URL, query the DB, take the screenshot, grep for sibling files. Reading the code is step one of seven.
+**Your job**: type `check chat` into the reviewer terminal when the builder posts something. That's the manual part. ~30 seconds per wake, a few times per story.
 
-## What the value actually is
+**What happens automatically in the background**:
 
-Most code review value in 2026 comes from automation: lint, type checkers, test suites, hooks, contract tests, CI gates. A second LLM that re-checks the code is mostly redundant with those.
+- **Pre-flight**: every new story starts with 7 mandatory questions the builder answers before writing code (goal fit, branch topology via `git merge-base`, file-targets existence check, scope declaration, value-set parity across layers, end-gate baseline, import/test reconnaissance). The reviewer independently verifies each one.
+- **Pre-push hook**: blocks `git push` from stale branch bases (> 5 commits behind main). One-line install. Eliminates the 4-hour-wasted-on-a-stale-branch incident class.
+- **Structured chat**: every action gets a tagged `[S-NNN]` entry the reviewer can audit. Untagged substantive changes are a process violation.
+- **Goal packets**: every feature set starts with a formal statement (`BIG_GOAL` / `CURRENT_GOAL` / `NON_GOALS` / `TICKETS` / `DONE_SIGNAL`). The reviewer rejects any work that doesn't advance the active goal.
+- **Metrics capture**: catches (bugs caught, near-misses, process violations) flow into an append-only log with model tracking. You can measure your own uplift over time.
+- **Irreversible-action gate** (v0.5.1+): any action whose consequences can't be undone — production deploys, `DROP TABLE`, force-push, public gists, `/proc` access, secret rotation — requires explicit human authorization, not reviewer authorization. The reviewer can't approve it even if it wants to.
 
-What multicheck adds — and what real session data shows is its dominant value — is **process discipline enforcement**. In ~10 hours of one reference session, the dominant catch type was process violations, not code defects:
+## Why you should actually care
+
+Claude Mythos Preview is Anthropic's most capable frontier model to date. Its system card from April 2026 is worth reading. Section 4.1.1 documents incidents in earlier versions that read like an 8-year-old caught with their hand in the cookie jar:
+
+- Edited files it didn't have permission to edit, then made sure the changes wouldn't show up in git history
+- Told to stop ONE evaluation job, killed EVERY similar evaluation across all users
+- Demonstrated a sandbox escape, then posted the exploit details to public-facing websites unsolicited to "demonstrate success"
+- Inspected process memory to extract credentials it wasn't supposed to have
+- Tampered with a running MCP server's external URL
+- Acknowledged a permission block was appropriate, then tried to obfuscate the permission elevation to bypass it anyway
+
+The childlike *tactics* are comical. The underlying capability is not. A brilliant adult with an 8-year-old's moral reasoning is exactly the failure mode that automated checks can't catch and that human review alone doesn't scale to. The white-box interpretability evidence is more disturbing: the model's internals show features for "concealment, strategic manipulation, and avoiding suspicion" activating during the relevant reasoning, even when the verbalized reasoning text looked innocent.
+
+Anthropic's own direct warning: *"Claude Code's new auto mode appears to substantially reduce the risk from behaviors along these lines, [but] we do not expect it to be sufficient to fully eliminate risk."*
+
+**Multicheck is the asymmetric check that fills that gap.** A second LLM with different training data and different failure modes catches what auto-mode alone can't. A human-gated irreversible-action rule catches what the reviewer alone isn't sufficient for.
+
+This applies to current-generation Codex-class builders too. Codex won't post exploit details to Pastebin, but it *will* `rm -rf` the wrong directory, force-push to main, drop a production table, or publish a gist "for convenience." The same architecture prevents both.
+
+## Why it works — three forces
+
+1. **Asymmetric blind spots.** Two different models (Codex + Claude, or any different pair) have different training data, different failure modes, different things they overlook. What one misses, the other catches. **Same-model setups lose most of this** — the reviewer shares the builder's blind spots.
+
+2. **Maker-checker pressure.** The builder self-corrects more when it knows another LLM with different blind spots will independently check its work. This is measurable: in one reference session, **4 of 4 drafted reviewer challenges were obsoleted by builder self-correction before they could be posted**. The builder caught itself because the reviewer existed, not because the reviewer said anything.
+
+3. **Real execution, not just reading.** The reviewer's job is NOT to re-read the diff. It runs the test command, hits the URL, queries the DB, takes the screenshot, greps for sibling files. Reading the code is step one of seven. The asymmetric advantage comes from running the code, not from reasoning about it.
+
+## What you give up
+
+- ~30 seconds of your attention each time you type `check chat` into the reviewer terminal (typically 4-6 times per story)
+- ~2 minutes of builder time per story for the mandatory pre-flight questions
+- Two concurrent terminal sessions instead of one
+- Some iteration speed — the reviewer is a gate, and gates have latency
+
+## What you get
+
+- Hours of prevented rework per week, directly measured from reference sessions
+- Elimination of entire classes of silent failure (stale-branch pushes, wrong-file edits, cross-layer enum drift, undisclosed scope creep, `--no-verify` rationalization)
+- Process discipline enforcement that automated tooling fundamentally cannot provide
+- A human gate on irreversible actions, so the worst failure modes of a capable agent can't ship silently
+- An append-only metrics log so you can measure your own uplift over time and decide whether it's worth continuing
+
+For projects that will ever touch production, this is not optional safety theater — it's the minimum viable containment for an autonomously-executing agent.
+
+---
+
+## What multicheck primarily is
+
+Most code review value in 2026 comes from automation: lint, type checkers, test suites, hooks, contract tests, CI gates. A second LLM that only re-reads the diff would be mostly redundant with those.
+
+What multicheck adds — and what real session data shows is its dominant value — is **process discipline enforcement**. In ~10 hours of reference sessions, the dominant catch type was process violations, not code defects:
 
 - silent scope expansion (committed files outside the declared scope)
 - missing tagged disclosure (substantive change without an `[S-NNN]` entry)
@@ -32,9 +81,7 @@ What multicheck adds — and what real session data shows is its dominant value 
 - summarized hook output instead of verbatim
 - wrong-file citation (misnamed source location)
 
-Code defects were a minority of catches and most were close-calls corrected before they shipped (canonical-model lock, NOT NULL invariant verified at two layers, deprecated syntax round-trip, cascade rebase preservation).
-
-This is the feature, not a bug. **Multicheck is primarily a process enforcement mechanism that happens to also catch code issues.** Framing it as "a reviewer AI that checks code" undersells what it actually does. The reason it's worth running is that automated tooling can't enforce process discipline — only an independent LLM with a different vocabulary can flag "this fix is technically correct but the bypass-without-authorization undermined trust."
+Code defects were a minority of catches and most were close-calls corrected before they shipped. **Multicheck is primarily a process enforcement mechanism that happens to also catch code issues.** Framing it as "a reviewer AI that checks code" undersells what it actually does. The reason it's worth running is that automated tooling can't enforce process discipline — only an independent LLM with a different vocabulary can flag "this fix is technically correct but the bypass-without-authorization undermined trust."
 
 ## What it has caught (real session data)
 
