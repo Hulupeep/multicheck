@@ -172,6 +172,172 @@ That is the entire setup.
 
 The builder will create `multicheck/` in your project root, fill out `multicheck/details.md` with real values from your repo, and post a first chat entry. The reviewer will run a baseline health check, post a first reviewer entry, and start checking the builder's work as it lands.
 
+### Walkthrough: new ticket to done
+
+Concrete example of what you actually do, from "I have a ticket to work on" through "it's merged." Assumes you've already done the one-time install and run the per-project setup above.
+
+**Phase 1 — Operator tells the builder about the new ticket**
+
+Paste into the BUILDER terminal:
+
+```
+Next story: #NNN <one-line goal>
+Post the 7-question pre-flight entry and wait for reviewer ack before writing any code.
+```
+
+The builder does NOT start coding. It reads the ticket, runs the pre-flight checks, and posts a `[S-NNN]` entry to `multicheck/agentchat.md` via heredoc append answering all 7 questions:
+
+- **Q1 Goal fit**: which `[G-NNN]` is active, quoted `CURRENT_GOAL`, how this story advances it
+- **Q2 Branch topology**: `git fetch && git merge-base HEAD origin/main` output, verified against `origin/main`
+- **Q3 File targets**: `ls` and `git log -1` output per file, rename check via `git log --diff-filter=DR`
+- **Q4 Scope declaration**: in-scope file list written into `details.md` before any edits
+- **Q5 Value-set parity**: new enum values? If yes, every layer they must propagate to
+- **Q6 End-gate + risk**: exact full pre-commit hook command + baseline count on `origin/main` + predicted failure mode
+- **Q7 Reconnaissance**: import traces, sibling tests surveyed, factory patterns identified, jest/ESM boundaries mapped, existing mocks surveyed, invariant test categories listed
+
+Then the builder stops and waits.
+
+**Phase 2 — Operator wakes the reviewer**
+
+Type into the REVIEWER terminal:
+
+```
+check chat
+```
+
+That's it — two words. The reviewer wakes, reads the pre-flight entry, and independently verifies each answer. Crucially, **the reviewer re-runs Q2 and Q3 from its own shell** — never trusting the builder's paste. If Q2 (branch topology) or Q3 (file existence) don't match, the reviewer rejects with a specific `MISSING:` field and the operator tells the builder to rebase or re-target. Loop until accept.
+
+The reviewer posts `[R-NNN] DECISION: accept` (or `reject`) with `INDEPENDENT VERIFICATION:` showing the commands it actually ran.
+
+**Phase 3 — Operator tells the builder to proceed**
+
+Paste into the BUILDER terminal:
+
+```
+Pre-flight acked. Proceed.
+```
+
+The builder writes code. Runs targeted tests as it goes. Posts periodic `[S-NNN] STATE: building` entries for significant decisions. Self-corrects immediately if it catches a mistake (`STATE: self-correction` — the reviewer counts this as a positive metric at session end).
+
+The operator leaves the builder alone. No micromanagement. The asymmetric-blind-spots + maker-checker pressure is doing the work.
+
+**Phase 4 — Builder declares ready for review**
+
+When the slice is code-complete, the builder runs the **full end-gate command** (not a targeted subset — the actual pre-commit hook command from `details.md`), captures the verbatim output, commits, pushes, and posts:
+
+```md
+### [S-NNN] HH:MM UTC — #NNN ready-for-review
+STATE: ready-for-review
+CLAIM: slice complete, full end-gate passed
+PROOF:
+- code: <final commit SHA + file list>
+- test: <exact command + "PASS 59 suites, 700 passed, 9 skipped, 3 todo">
+- slice purity: git diff --name-only origin/main...HEAD matches details.md in-scope
+...
+```
+
+Then stops again.
+
+**Phase 5 — Operator wakes the reviewer again**
+
+Type into the REVIEWER terminal:
+
+```
+check chat
+```
+
+The reviewer runs its 7-step verification order from a clean shell:
+
+1. Code check — does the cited file:line contain what the builder claims?
+2. Wider grep — consistent with sibling files? Other definitions reachable from production?
+3. End-gate command — does the FULL pre-commit hook pass? Not the targeted test.
+4. Local test suite — matching counts?
+5. Deployment status — live and READY? (if applicable)
+6. Production URL — does the live surface respond? (if applicable)
+7. Database truth — do the rows exist that the real flow should have written? (if applicable)
+8. Evals — if declared in `details.md`, run them and include output in verdict
+
+The reviewer also runs applicable verification recipes (slice purity, diff-content check on cascaded files, wider grep before fix recommendations, cross-layer value consistency).
+
+Posts `[R-NNN]` with two-axis verdict: `TECHNICAL` + `PROCESS` independent. `DECISION: accept | accept-with-stipulations | reject | needs-more-proof`.
+
+**Phase 6 — Operator tells the builder to open a draft PR**
+
+```
+Reviewer acked. Open a draft PR.
+```
+
+The builder runs `gh pr create --draft`, writes a title/body citing the goal packet, the PR diff scope, the end-gate result, and any stipulations. Then stops.
+
+**Phase 7 — Reviewer runs the project-level PR audit + optional external swarm**
+
+Type into the REVIEWER terminal:
+
+```
+check chat. run the project pr.md audit on the draft. if an external swarm is available, invoke it on the final head before accepting.
+```
+
+The reviewer runs the project's `pr.md` audit (slice purity vs declared scope, content drift, stacked-PR base alignment). If the project has an external code-review swarm configured, the reviewer triggers it on the final PR head. All three reviewer layers (`pr.md` + primary reviewer + external swarm) consolidate into a single verdict in `agentchat.md`.
+
+This is where the **third layer catches what the first two missed**. Empirical reference: in one session the external swarm caught a cross-layer enum drift (`consultation_no_show`) that both `pr.md` and the primary reviewer had passed.
+
+**Phase 8 — If the work touches production, the irreversible-action gate fires**
+
+If merging the PR triggers production deploy, destructive migration, secret rotation, auth logic change, or any other irreversible action, the builder posts `[S-NNN] STATE: irreversible-request` with blast radius, rollback plan, monitoring strategy, and `ASK: human-authorization`.
+
+**The reviewer cannot authorize this.** Only the human operator can. You paste:
+
+```
+[H-NNN] DECISION: irreversible-authorized
+SCOPE: <exactly what is authorized — specific commits, specific targets>
+WHY: <one-line rationale>
+```
+
+...into the BUILDER terminal (the builder appends it to `agentchat.md` via heredoc). The builder executes the action and posts verification.
+
+**Phase 9 — Merge and metrics**
+
+The builder marks the PR ready (`gh pr ready`), CI fires, merge lands. The reviewer posts `[R-NNN] DECISION: accept` on the merge, cross-links the gh merge comment back to `agentchat.md`, and the slice is formally done.
+
+**Phase 10 — End of session metrics**
+
+At end of day (or end of feature set), paste the METRICS.md daily-ask prompts into both terminals. Each agent enumerates its catches — self-corrections for the builder, rejections and bonus verifications for the reviewer — and appends rows to `multicheck/metrics.md` via heredoc. The reviewer posts a final `[R-FINAL]` session report that also copies to `multicheck/sessions/<UTC>.md`.
+
+**Total operator effort for one ticket**: roughly 5-6 `check chat` pastes + 1 pre-flight instruction + 1 proceed + 1 draft-PR instruction + 1 PR-review instruction + 0 or 1 irreversible-request authorization. If you need to make a ~30-second decision for each paste, that's about 3-5 minutes of attention for a 1-2 hour slice. The rest is the agents running on their own.
+
+### What a short story looks like in practice
+
+Not every ticket hits every phase. A typical small story flow:
+
+```
+You:       Next story: #432 rename fooBar -> foo_bar across the codebase
+Builder:   [S-041] pre-flight posted, Q1-Q7 all clean, waiting for ack
+You:       (into reviewer) check chat
+Reviewer:  [R-018] accept - verified branch base, file targets, no new values
+You:       (into builder) proceed
+Builder:   [S-042] building
+Builder:   [S-043] ready-for-review, PASS 59 suites, 700/9/3, 12 files changed
+You:       (into reviewer) check chat
+Reviewer:  [R-019] accept - end gate green, slice pure, no cross-layer changes
+You:       (into builder) open draft PR
+Builder:   [S-044] PR #1247 draft created
+You:       (into reviewer) check chat - pr.md audit
+Reviewer:  [R-020] accept - pr.md clean, no external swarm needed for this slice
+You:       (into builder) ready and merge
+Builder:   [S-045] merged, done
+```
+
+Total operator input: 5 short pastes, ~3 minutes of attention. Total elapsed time: whatever the builder takes to actually do the work, usually 15-45 minutes for a small slice.
+
+### When things go sideways
+
+- **Reviewer rejects pre-flight** → paste the reviewer's `MISSING:` field into the builder terminal, builder fixes, re-post, loop.
+- **Reviewer rejects with `accept-with-stipulations`** → the code is fine but a process violation needs acknowledgment. Tell the builder to post a self-correction entry acknowledging the stipulation, then proceed.
+- **Reviewer rejects for goal-divergence** → the work doesn't advance the active `[G-NNN]`. Either the builder re-scopes, or you post a new `[G-NNN]` amending the goal, then the builder re-posts the pre-flight under the new goal.
+- **Builder hits a harness failure (test can't import something)** → the builder runs the harness-failure triage framework (5-step decision tree: existing factory? sibling mock pattern? product-code shape problem? wrong test boundary?) and posts a `HARNESS TRIAGE:` block. Reviewer verifies the triage was actually applied, not just referenced.
+- **Builder wants to use `--no-verify` or `--force`** → builder posts `STATE: bypass-request` with full hook output verbatim. Reviewer decides — if reversible, reviewer can ack; if irreversible, reviewer kicks it to you as `irreversible-request`.
+- **The chat is getting too long / you want to rotate to a new feature set** → tell the builder "archive this and start fresh on <next feature>." Builder posts `STATE: archive-request`, reviewer verifies no open work, builder runs the 8-step archive procedure, new chat starts fresh with `[G-(N+1)]`.
+
 ---
 
 ## Current provider pairing recommendation
