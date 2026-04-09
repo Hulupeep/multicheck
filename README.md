@@ -10,7 +10,7 @@ When you run a second, different LLM that independently checks the first LLM's w
 
 **How**: two terminals, two different LLMs, one shared chat file. Codex builds. Claude reviews. They talk in a structured format. The reviewer doesn't trust the builder's status updates — it runs the tests itself, hits the URLs itself, queries the DB itself.
 
-**Your job**: type `check chat` into the reviewer terminal when the builder posts something. That's the manual part. ~30 seconds per wake, a few times per story.
+**Your job**: monitor adherence, not implementation. You don't write code. You don't write specs (the builder extracts them from the ticket). You don't verify the work (the reviewer does). Your role is the ritual — initiating stories, waking the reviewer at phase boundaries, and authorizing irreversible actions when the protocol escalates them to you. Think of yourself as the conductor making sure the orchestra plays in time, not the composer or any of the musicians. In practice this is ~30 seconds of attention per wake, a few times per story, and a total of 3-5 minutes of your time per slice.
 
 **What happens automatically in the background**:
 
@@ -20,6 +20,38 @@ When you run a second, different LLM that independently checks the first LLM's w
 - **Goal packets**: every feature set starts with a formal statement (`BIG_GOAL` / `CURRENT_GOAL` / `NON_GOALS` / `TICKETS` / `DONE_SIGNAL`). The reviewer rejects any work that doesn't advance the active goal.
 - **Metrics capture**: catches (bugs caught, near-misses, process violations) flow into an append-only log with model tracking. You can measure your own uplift over time.
 - **Irreversible-action gate** (v0.5.1+): any action whose consequences can't be undone — production deploys, `DROP TABLE`, force-push, public gists, `/proc` access, secret rotation — requires explicit human authorization, not reviewer authorization. The reviewer can't approve it even if it wants to.
+
+## Who this is for
+
+Multicheck is built primarily for **non-technical operators** — product managers, product designers, technical founders without a coding background, domain experts who know what they want built but don't write production code themselves. It's the answer to a gap that only opened in the last 18 months: LLMs are now good enough for a non-coder to drive feature work directly, but the output is variable because the LLM drifts from the operator's intent and there's nothing to catch the drift.
+
+This is the difference between **vibe coding** (non-coder prompts an LLM, gets code, ships it, prays) and **intent-preserving production development** (non-coder states intent via goal packet, LLM builds, asymmetric reviewer enforces adherence, human gates the irreversible actions, production output is stable). Vibe coding got the "non-coder drives the LLM" part working. Multicheck makes the output stable enough to ship into a production stack without a developer intermediary holding your hand through every step.
+
+You don't need to read code. You don't need to verify the implementation. You don't need to know which test framework the project uses or how `git merge-base` works. The asymmetric reviewer LLM does all of that. Your role is to **hold your intention stable while the code is being built** — everything the protocol does is in service of that one goal:
+
+- The **goal packet** captures your intent as a structured, refer-back-able artifact (`BIG_GOAL` / `CURRENT_GOAL` / `NON_GOALS` / `TICKETS` / `DONE_SIGNAL`). The builder writes it from the ticket; you review it in ~20 seconds.
+- The **pre-flight questions** catch LLM assumption-drift before any code is written. The reviewer verifies the builder understood the story correctly.
+- The **reviewer** (a different LLM with different blind spots) independently verifies the code matches the intent, not just "does the test pass."
+- The **operator** (you) monitors that this loop is running and handles escalations. You are the conductor, not the composer or any of the musicians.
+- The **irreversible-action gate** routes destructive operations through you explicitly, so nothing that would require a technical judgment call slips through without your explicit OK.
+
+The outcome: **a non-coder can drive a feature from "I want this" through production with their intention preserved**, in a bounded class of work, without needing a developer intermediary. That was not really possible before multicheck. Pre-LLM you needed a developer for any production work. Early-LLM vibe coding gave you code but with variable quality. This is the first pattern where a non-technical operator can hold their intention stable while production-grade code gets built, because the safety net is the protocol, not the operator's technical knowledge.
+
+**What multicheck does NOT replace**:
+
+- **The tech lead.** Architecture decisions, infrastructure design, complex debugging, performance tuning, deep algorithmic work, and the genuinely-hard technical judgment calls still need a senior engineer. Multicheck is for the *I-know-what-I-want-and-need-the-LLM-to-build-it-stably* class of work, which is a large but bounded subset.
+- **Domain expertise.** If you don't know what you want, multicheck can't help you figure it out. The goal packet requires you to articulate `CURRENT_GOAL` and `DONE_SIGNAL`. Clarity of intent is the precondition for the protocol to work.
+- **Eventual architectural review.** The reviewer LLM catches adherence drift; a tech lead still needs to look at the architectural fit of the work, especially for anything that touches the core of a production system.
+
+**What it DOES replace**:
+
+- The "PM writes a ticket, developer implements it exactly as stated, PM finds out at demo it wasn't what they meant" cycle. The goal packet + pre-flight front-loads the alignment check so the misinterpretation is caught before any code is written.
+- The "vibe coding ships half-done features with silent regressions" outcome. The asymmetric reviewer catches the drift before it lands.
+- The "I need to pull the tech lead in for this small feature" bottleneck for small-to-medium work. For bounded work, the asymmetric reviewer is the tech lead's discipline automated into a protocol.
+
+If you are a product manager, product designer, or technical founder without a coding background, and you've been frustrated by the gap between "I can prototype with an LLM in an afternoon" and "but it's not production-safe" — multicheck is the missing piece. If you are a tech lead reading this because your PM is driving you crazy asking you to implement every small change, multicheck is the protocol you can give them so they can drive their own work safely without dragging you in.
+
+---
 
 ## Why you should actually care
 

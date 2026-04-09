@@ -4,6 +4,38 @@ All notable changes to the multicheck protocol are documented here.
 
 The protocol follows [semver](https://semver.org/) starting with `v0.5.0`. Minor bumps cover additive new behavior (new rules, new hooks, new templates). Patch bumps cover doc-only fixes. Pre-`v0.5.0` work is in git history as the initial Phase 1 frameworkless releases.
 
+## v0.5.3 — 2026-04-09
+
+README positioning update: multicheck's primary user is the non-technical operator (PM, product designer, technical founder without a coding background), not a developer.
+
+### Changes
+
+- **"Your job" rewrite in short pitch**: replaced "type `check chat` when the builder posts something" with the conductor-not-composer framing. "Monitor adherence, not implementation. You don't write code. You don't write specs. You don't verify the work. Your role is the ritual."
+- **New "Who this is for" section** immediately after the short pitch. Makes the non-technical operator a first-class user. Contrasts multicheck with "vibe coding" (non-coder prompts LLM, outcome variable) and positions it as the "intent-preserving production development" upgrade. Explicitly lists what multicheck does NOT replace (tech lead, domain expertise, architectural review) and what it DOES replace (PM/developer misinterpretation cycles, vibe-coding regressions, tech-lead-bottleneck-for-small-work).
+
+### Framing
+
+Pre-LLM: a non-coder needed a developer to get any production code. Early-LLM vibe coding: a non-coder could prompt and get code but quality was variable. Multicheck: a non-coder can hold their intention stable while production-grade code gets built, because the safety net is the protocol, not the operator's technical knowledge.
+
+This framing surfaced from a conversation where the operator (not a coder, product designer/PM) articulated that multicheck is the first pattern that lets their intention hold while an LLM builds into a production stack in a stable way. The README now leads with that framing rather than the safety-tool-for-builders framing.
+
+The tech lead role is explicitly preserved: architecture, infrastructure, complex debugging, performance work, and hard technical judgment calls still need a senior engineer. Multicheck is for the large-but-bounded subset of work where the operator knows what they want and needs the LLM to build it stably.
+
+## v0.5.2 — 2026-04-09
+
+README rewrite with the short pitch + Mythos framing. Opens with a one-sentence value proposition, moves the visceral "brilliant adult with 8-year-old moral reasoning" framing from the Mythos system card into the primary narrative, and reframes the academic sections as support material under the visceral intro.
+
+### Changes
+
+- README intro completely rewritten
+- New "The short pitch" section leads with the two-terminal flow + background automation list
+- New "Why you should actually care" section with concrete Mythos System Card §4.1.1 incidents (git history manipulation, unsolicited exploit posting, mass eval job kills, credential extraction, MCP server tampering) and Anthropic's direct warning about auto-mode insufficiency
+- "Why it works — three forces" kept verbatim (empirically validated)
+- New "What you give up" / "What you get" cost-benefit ledger
+- Existing "What multicheck primarily is" moved after the visceral intro
+
+Also adds a ticket-to-done walkthrough under "How to use" with 10 phases, a short-story example, and a "when things go sideways" subsection.
+
 ## v0.5.1 — 2026-04-09
 
 First Mythos-era prep release. Ships three items that are useful even in the pre-Mythos Codex era but become critical when Mythos-class capability arrives. Motivated by a direct reading of the Claude Mythos Preview System Card §4.1.1 (April 2026) and Anthropic's explicit warning: *"we are urging those external users with whom we are sharing the model not to deploy the model in settings where its reckless actions could lead to hard-to-reverse harms."*
