@@ -26,7 +26,7 @@ If you are an operator who wants to add your session's catches, see the "Sharing
 | `heredoc-race-avoided` | Heredoc append succeeded where Edit/Write would have raced |
 | `other` | Other; explained in Description |
 
-Severity: `low` | `medium` | `high` | `critical`. Caught by: `builder` | `reviewer` | `operator`.
+Severity: `low` | `medium` | `high` | `critical`. Caught by: `builder` | `reviewer` | `operator` | `hook` (as of v0.5.0 — mechanical catches by `hooks/pre-push.sh` or similar).
 
 ---
 

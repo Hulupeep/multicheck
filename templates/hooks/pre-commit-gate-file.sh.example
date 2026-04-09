@@ -1,0 +1,117 @@
+#!/bin/sh
+# multicheck template: pre-commit proceed-to-code gate lock
+#
+# INSTALL INSTRUCTIONS
+# 1. This hook is OPTIONAL. It only applies to projects using a reviewer-gate
+#    pattern with a shared ledger file and tagged reviewer/builder entries.
+# 2. Copy this file to .git/hooks/pre-commit (or merge with existing hook)
+#    and make it executable: chmod +x .git/hooks/pre-commit
+# 3. Adjust LEDGER_FILE, REVIEWER_TAG_PATTERN, CLEARANCE_PATTERNS, and
+#    SOURCE_FILE_PATTERN below to match your project's tag vocabulary and
+#    file layout.
+# 4. Test on a clean branch before relying on it in production.
+#
+# HOW IT WORKS
+# When a commit is attempted, this hook:
+#   1. Checks whether any staged files are source code (via SOURCE_FILE_PATTERN)
+#   2. If yes, reads the ledger file and finds the latest reviewer entry
+#   3. Verifies the latest reviewer entry contains a clearance string
+#   4. Blocks the commit if no clearance is found
+#
+# This enforces the "proceed-to-code gate" pattern: source code commits
+# require an explicit reviewer ack in the ledger file before they can land.
+#
+# WHEN TO USE THIS
+#   - Your project has a dedicated reviewer agent (or human reviewer with
+#     push access) who writes entries to a shared ledger file
+#   - Your ledger uses a specific tag format (e.g. [R-001], [REVIEW-001])
+#   - The reviewer posts explicit clearance strings ("proceed-to-code
+#     cleared", "pre-flight ACK", etc.) to clear the gate for coding
+#
+# WHEN NOT TO USE THIS
+#   - Solo development without a reviewer layer
+#   - Projects without a shared ledger file
+#   - Fast iteration where review happens at PR time, not at commit time
+#
+# REFERENCE INCIDENT
+# claims-monorepo session 2026-04-09, [S-126] skipped proceed-to-code gate
+# 11 minutes after [R-044] posted the block. The decision substance was
+# correct but the gate was procedurally skipped. Captured in [R-045] as a
+# non-blocking protocol violation. This hook would have blocked the commit
+# mechanically.
+
+# ─────────────────────────────────────────────────────────────────────────
+# CONFIGURATION — adjust these for your project
+# ─────────────────────────────────────────────────────────────────────────
+
+LEDGER_FILE="multicheck/agentchat.md"
+REVIEWER_TAG_PATTERN='^### \[R-[0-9]\+\]'
+BUILDER_TAG_PATTERN='^### \[S-[0-9]\+\]'
+CLEARANCE_PATTERNS='PROCEED-TO-CODE.*(cleared|ack)|proceed-to-code.*(cleared|ack)|pre-flight.*(ack|cleared)|DECISION: accept'
+SOURCE_FILE_PATTERN='\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|rb|java|kt|swift)$'
+CLEARANCE_SEARCH_LINES=50  # how many lines after the reviewer heading to search
+
+# ─────────────────────────────────────────────────────────────────────────
+# IMPLEMENTATION — usually no changes needed below this line
+# ─────────────────────────────────────────────────────────────────────────
+
+# Skip if ledger file doesn't exist (project not using this pattern)
+if [ ! -f "$LEDGER_FILE" ]; then
+  exit 0
+fi
+
+# Get the staged set
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Skip if nothing staged
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+# Check if any staged files match the source-file pattern
+SOURCE_STAGED=$(echo "$STAGED" | grep -cE "$SOURCE_FILE_PATTERN" || true)
+if [ "$SOURCE_STAGED" -eq 0 ]; then
+  # No source code in the staged set — allow (docs-only commits pass)
+  exit 0
+fi
+
+# Find the latest reviewer and builder entry line numbers
+LATEST_R=$(grep -n "$REVIEWER_TAG_PATTERN" "$LEDGER_FILE" | tail -1 | cut -d: -f1)
+LATEST_S=$(grep -n "$BUILDER_TAG_PATTERN" "$LEDGER_FILE" | tail -1 | cut -d: -f1)
+
+# If no reviewer entries exist, block with a helpful message
+if [ -z "$LATEST_R" ]; then
+  echo "" >&2
+  echo "multicheck: proceed-to-code gate — no reviewer entries in $LEDGER_FILE" >&2
+  echo "multicheck: source code commits require an explicit reviewer ack first" >&2
+  exit 1
+fi
+
+# If the latest builder entry is NEWER than the latest reviewer entry,
+# the builder has posted after the last reviewer — check for clearance.
+if [ -n "$LATEST_S" ] && [ "$LATEST_S" -gt "$LATEST_R" ]; then
+  CLEARANCE=$(sed -n "${LATEST_R},$((LATEST_R + CLEARANCE_SEARCH_LINES))p" "$LEDGER_FILE" | grep -c -iE "$CLEARANCE_PATTERNS" || true)
+
+  if [ "$CLEARANCE" -eq 0 ]; then
+    echo "" >&2
+    echo "============================================================" >&2
+    echo "  MULTICHECK PROCEED-TO-CODE GATE - NOT CLEARED" >&2
+    echo "============================================================" >&2
+    echo "" >&2
+    echo "  Staged set contains source code, but the latest reviewer" >&2
+    echo "  entry in $LEDGER_FILE does not contain an explicit" >&2
+    echo "  proceed-to-code clearance." >&2
+    echo "" >&2
+    echo "  Latest reviewer entry:" >&2
+    sed -n "${LATEST_R}p" "$LEDGER_FILE" | sed 's/^/    /' >&2
+    echo "" >&2
+    echo "  Expected clearance string (case-insensitive, regex):" >&2
+    echo "    $CLEARANCE_PATTERNS" >&2
+    echo "" >&2
+    echo "  Wait for the reviewer to post a clearance, then retry." >&2
+    echo "" >&2
+    exit 1
+  fi
+fi
+
+exit 0

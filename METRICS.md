@@ -66,8 +66,9 @@ ISO date `YYYY-MM-DD`. UTC.
 ### Caught by
 
 - **`builder`** — for `pre-emptive-self-correction` only. The builder caught its own mistake.
-- **`reviewer`** — for everything else. The reviewer found it in the builder's work or in its own draft.
+- **`reviewer`** — for everything else that a human-ish reviewer found. Includes findings in the builder's work OR in its own draft.
 - **`operator`** — rare. The human operator caught something neither agent did. Counts as an anti-pattern (means the protocol missed it) but should still be logged.
+- **`hook`** — a git hook or other automated check blocked the bad state mechanically. Examples: `hooks/pre-push.sh` blocks a stale-base push; `templates/hooks/pre-commit-gate-file.sh.example` blocks a commit missing reviewer clearance. Hook catches are valuable data — they show automation closing the markdown-discipline ceiling — and should be logged with the hook name and commit SHA (or push attempt) as evidence.
 
 ### Description
 

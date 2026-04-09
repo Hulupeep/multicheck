@@ -188,11 +188,59 @@ The role split matters: Claude Code reads `CLAUDE.md` and IS the reviewer (in th
 
 ## Phase
 
-This is **Phase 1 — frameworkless**. Intentionally minimal. Every rule is enforced by LLM discipline reading instructions, not by tooling.
+**Phase 1.5** as of v0.5.0 (2026-04-09). Multicheck started as pure Phase 1 frameworkless — every rule enforced by LLM discipline reading instructions, no tooling. Real session data showed that markdown discipline has a ceiling: the builder in a reference session had a 15+ item gotcha checklist, ran every check they knew to run, and still missed a branch-base condition because it wasn't in the playbook. That cost 4 hours of rework.
 
-Phase 2+ may add: a session-state CLI that prevents builder self-acceptance, a wakeup bridge for the reviewer LLM (the reviewer cannot autonomously poll between operator messages), multi-repo coordination, mutation testing as a verification step, and a contract drift detector. Those are deferred until Phase 1 has produced enough sessions to prove which frictions actually matter.
+Phase 1.5 adds **minimal hooks for automation where markdown has hit its ceiling**, without replacing the markdown discipline:
 
-The Phase 1 hypothesis: most of the value comes from instructions and the asymmetric pairing, not from tooling. The session metrics above are the first evidence supporting that hypothesis.
+- `hooks/pre-push.sh` — blocks pushes from stale branch bases. Self-disables when offline, tolerates up to 5 commits of drift. The pre-flight Q2 (branch topology) is still the primary discipline; the hook is belt-and-suspenders for cases where the builder is tired, rushed, or new to the protocol.
+- `templates/hooks/pre-commit-gate-file.sh.example` — optional template for projects using a reviewer-gate pattern with a shared ledger file.
+
+Hooks are optional, self-disabling in hostile environments, and never a replacement for the markdown discipline. See the "Hooks" section below for install instructions.
+
+Phase 2+ may add: a propagation manifest + contract schema extension for write-time cross-layer value consistency (currently prototyping on claims-monorepo), multi-repo coordination, a wakeup bridge for the reviewer LLM, and mutation testing as a verification step. Those are deferred until Phase 1.5 has produced enough sessions to prove which additional frictions warrant tooling.
+
+The Phase 1 hypothesis held: most of the value comes from instructions and the asymmetric pairing, not from tooling. The session metrics above confirm that ~60% of catches are process-class findings and ~8% are code defects. Phase 1.5 closes the small number of markdown-ceiling gaps without shifting the protocol's center of gravity toward tooling.
+
+## Hooks
+
+Multicheck v0.5.0 introduces two git hooks. Both are opt-in via `install-hooks.sh` (or manual copy).
+
+### Installing the default hook
+
+From the root of your target project:
+
+```bash
+sh ~/code/multicheck/install-hooks.sh
+```
+
+This installs `hooks/pre-push.sh` into your target project's `.git/hooks/pre-push`. Any existing hook is backed up to `.git/hooks/pre-push.pre-multicheck.bak`.
+
+### What `pre-push.sh` does
+
+Every `git push`:
+
+1. Runs `git fetch origin main` (silently exits if offline)
+2. Computes `git merge-base HEAD origin/main` and compares to `git rev-parse origin/main`
+3. If the branch is more than 5 commits behind main, blocks the push with an informative message pointing you to rebase or branch fresh
+4. Otherwise, allows the push
+
+Override per-push with `git push --no-verify` or raise the threshold with `MULTICHECK_PREPUSH_THRESHOLD=<N> git push`.
+
+The hook is ~80 lines of POSIX shell. Read it at `hooks/pre-push.sh` before installing — that's ~2 minutes and guarantees you understand what's running in your git hooks path.
+
+### Optional hooks (not installed by default)
+
+**`templates/hooks/pre-commit-gate-file.sh.example`** — for projects using a reviewer-gate pattern with a shared ledger file (e.g., `multicheck/agentchat.md`). Enforces that source-code commits require an explicit reviewer clearance in the ledger before they can land.
+
+This is an **opt-in template**, not a core feature. Most projects don't need it. It's provided for projects that have encountered the "gate skip under completion drive" failure mode (reference: claims-monorepo `#611` session, `[S-126]` incident, 2026-04-09).
+
+To install:
+
+1. Copy the template: `cp templates/hooks/pre-commit-gate-file.sh.example /path/to/target/.git/hooks/pre-commit`
+2. Adjust the configuration block at the top (LEDGER_FILE, tag patterns, clearance strings, source-file pattern) to match your project
+3. Make it executable: `chmod +x .git/hooks/pre-commit`
+
+See the template file header for full documentation.
 
 ---
 
