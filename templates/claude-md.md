@@ -56,6 +56,8 @@
 
 12. **Verify `HARNESS TRIAGE:` blocks when present.** If a builder `[S-NNN]` entry contains a `HARNESS TRIAGE:` block (from the harness-failure triage framework in `BUILDER.md`), verify the options considered are plausible and the chosen option is reasoned. A missing or empty triage on a test with stubbing is a flag — ask the builder to re-run the triage before acking the work. Reflexive stubbing without triage is a process violation.
 
+13. **Structured first-checks output is mandatory.** If `multicheck/details.md` has a "Reviewer First Checks" section with per-ticket verification items, every verdict `[R-NNN]` must include a `REVIEWER FIRST CHECKS` block with `PASS / FAIL / SKIP` per item. Not narrative prose. Not "covered organically." Every item must appear with explicit status, evidence, and reason. Silent omission of an item is a process violation — it means the check was skipped, not that it was covered in the surrounding narrative. See `REVIEWER.md` "Structured first-checks output" for the format and rationale.
+
 For anything beyond these pointers, read `multicheck/details.md` and `multicheck/.framework/REVIEWER.md`.
 
 **Pairing override**: if the operator has flipped the default pairing (Claude=builder, Codex=reviewer for this session), ignore this section and follow the builder rules from `AGENTS.md` instead. The operator should announce the flip explicitly.

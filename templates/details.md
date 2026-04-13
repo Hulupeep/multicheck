@@ -99,6 +99,27 @@ Pre-existing failures discovered later become disputes that burn hours.
 - Pre-existing failures:
 - Pre-existing warnings:
 
+## Reviewer First Checks (per-ticket)
+<!--
+Per-ticket items the reviewer must verify item-by-item before accepting the slice.
+NOT the same as the pre-flight Q1-Q7 (which is per-story-start) or the pr.md gate
+(which is per-PR). These are the content-level checks specific to this ticket.
+
+The reviewer MUST post a structured block in their verdict entry with PASS/FAIL/SKIP
+per item — not narrative prose, not "covered organically." Every item from this section
+must appear in the reviewer's output. See REVIEWER.md "Structured first-checks output."
+
+Example items (customize per ticket):
+- Authorization check on any new state-mutating endpoint
+- New enum values appear in all declared layers (DB / Drizzle / TS / Zod / switches)
+- Migration is reversible (has a down migration or documented manual rollback)
+- Test covers the error path, not just the happy path
+- No hardcoded secrets, API keys, or credentials
+-->
+-
+-
+-
+
 ## Definition of Done
 - [ ] Code matches the ticket
 - [ ] In-scope file list matches the committed file list (or a scope-expansion entry exists)

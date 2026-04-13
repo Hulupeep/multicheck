@@ -242,6 +242,33 @@ If a `[S-NNN]` entry contains a `HARNESS TRIAGE:` block (documenting a test-harn
 
 The triage framework prevents reflexive stubbing cascades. The reviewer's job is to ensure the framework was actually applied, not just referenced.
 
+### Structured first-checks output (mandatory)
+
+When the target project's `multicheck/details.md` has a "Reviewer First Checks" section with per-ticket verification items, the reviewer MUST post a structured block in EVERY verdict entry with `PASS / FAIL / SKIP` per item. Not narrative prose. Not "covered organically." Every item from the section must appear in the reviewer's output with explicit status.
+
+**Why this exists**: "organic coverage" creates the illusion of thoroughness. The reviewer's narrative verification can claim items were "covered in substance" while silently skipping the actual check. This was empirically demonstrated in a reference session (R-050 incident): the specialist-persona sweep was procedurally compliant (all five hats named, one finding-or-clean line per hat) but the security hat wrote "clean" without actually verifying authorization on a state-mutating endpoint. The reviewer filled in the form without running the check. The structured per-item output format forces each item to be explicitly addressed, making silent skips visible.
+
+**Format**: include this block in every `[R-NNN]` verdict for a slice:
+
+```md
+REVIEWER FIRST CHECKS (from details.md, per-item):
+- <item 1 verbatim from details.md>: PASS | FAIL | SKIP (<reason>) — <1-line evidence>
+- <item 2 verbatim from details.md>: PASS | FAIL | SKIP (<reason>) — <1-line evidence>
+- <item 3 verbatim from details.md>: PASS | FAIL | SKIP (<reason>) — <1-line evidence>
+...
+```
+
+**Rules**:
+
+- Every item from `multicheck/details.md` "Reviewer First Checks" section must appear in this block
+- `PASS` requires a 1-line evidence citation (file:line, command output, grep result)
+- `FAIL` requires a 1-line description of what's wrong and a reference to the `MISSING:` field in the verdict
+- `SKIP` is allowed but requires a reason ("not applicable to this sub-slice because X")
+- Missing items (items from `details.md` that don't appear in this block) are treated as silent skips — the same process violation as "organic coverage without structured confirmation"
+- If `details.md` has no "Reviewer First Checks" section, this block is omitted (the ticket has no per-ticket checks declared)
+
+**Anti-pattern this prevents**: the reviewer writes a 200-line narrative about what they verified, but one critical item (e.g., "authorization check on the new state-mutating endpoint") was never actually checked — it just got "covered organically" by the surrounding prose. The structured format makes the gap visible because the missing line is literally absent from the block.
+
 ### What to do if the pre-flight is missing
 
 If the builder posts `STATE: building` with substantive work but no prior pre-flight entry, that's a process violation equivalent to "substantive changes without tagged `[S-NNN]`". Reject with `DECISION: reject` and require the builder to post a retroactive pre-flight `[S-NNN]` entry before you verify anything else. The ack then applies to the work already done, but future stories must follow the pre-flight-first order.
