@@ -32,6 +32,21 @@ STATE values (builder)
                       session falls back to v1 manual `check chat` relay
                       for the remainder. See BUILDER.md / REVIEWER.md
                       §Start Monitor (MON-003) for reaction guidance.
+  verdict-accepted  — (MON-004) Claude-Builder reacted to a reviewer PASS
+                      verdict; committed if needed; stopped awaiting next
+                      ticket. See BUILDER.md §Claude-as-Builder Monitor
+                      reactions.
+  awaiting-human    — (MON-004) Claude-Builder is blocked pending `[H-NNN]`
+                      human authorization. Triggered by reviewer-written
+                      ESCALATE, irreversible-gate fire on PASS, or
+                      auto-ESCALATE after 3 FAILs.
+  malformed-verdict — (MON-004) reviewer's FAIL verdict lacks a usable
+                      **Required fixes:** list or required fields;
+                      builder refuses to resubmit speculatively and asks
+                      reviewer to re-verdict.
+  verdict-unrecognized — (MON-004) reviewer's verdict references a
+                      **Task-id:** that does not match any prior builder
+                      submission; builder takes no action until resolved.
   accepted          — reviewer-only; never set by builder
 
 ═══════════════════════════════════════════════════════════════════════════════

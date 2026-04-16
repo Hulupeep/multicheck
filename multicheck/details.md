@@ -59,10 +59,20 @@ the protocol on its own development.
 ## In-scope files (per current ticket)
 <!--
 Updated by the builder at the start of each ticket, before any edits.
-Current ticket: #27 MON-003 (Claude-side Monitor documentation — prompt-pattern based, narrowed per operator 14:12 UTC to Claude Code runtime only).
-Authorized by [R-020] DECISION: accept on combined [S-018]+[S-019]+[S-020] pre-flight at HEAD 612a0d9 against twice-edited issue #27 body (14:12 reversal + 14:19 narrow).
-Prior tickets: #25 MON-001 at 8ee2b15; #26 MON-002 at b0eda73; The_8_Layers.md at 612a0d9 (per [H-006]).
+Current ticket: #28 MON-004 (Claude-Builder-side reaction protocol — 3-FAIL auto-ESCALATE).
+Authorized by [R-027] DECISION: accept on revised [S-026] pre-flight at HEAD 6d2e5ed against issue #28 body re-edited per option (c) at 15:15 UTC.
+Prior tickets: #25 MON-001 at 8ee2b15; #26 MON-002 at b0eda73; #27 MON-003 at 6d2e5ed; The_8_Layers.md at 612a0d9 (per [H-006]).
 -->
+- Ticket #: 28 (MON-004)
+- Files:
+  - `BUILDER.md` — new §Claude-as-Builder Monitor reactions section describing PASS/FAIL/ESCALATE state machine + 3-FAIL cap (auto-ESCALATE with `**Reviewer:** claude-builder-auto` + `**Reason:** max-fail-cycles-reached`) + notify-send/terminal-bell fallback + irreversible-gate preservation (v0.5.1) + fail_counter read/write against details.md + malformed-verdict/unrecognized-task-id defensive branches.
+  - `templates/details.md` — `fail_counters:` key schema documented alongside `pairing:` (MON-001 precedent for details.md additions); per-Task-id counter with reset-on-new-task semantic.
+  - `templates/agentchat.md` — extend STATE vocabulary block with 4 new values per F-R023-02 operator authorization: `verdict-accepted` (builder reacts to PASS), `awaiting-human` (builder reacts to ESCALATE or irreversible-gate), `malformed-verdict` (builder refuses FAIL with empty fixes list), `verdict-unrecognized` (builder refuses verdict referencing unknown task-id).
+  - `tests/contracts/mon-004.test.js` — promote 11 test.todo → test() per [S-026]/[R-027] disposition (MON-004-001/-002/-003/-004/-005/-006 + INV-001/-002 + J-PASS/J-FAIL-RESUBMIT/J-AUTO-ESCALATE) + 3 DEFER test.todo (MON-004-007 covered-by-§Harness-triage; INV-003 negative-covered-by-001; J-HUMAN-ESCALATE covered-by-004).
+- OUT OF SCOPE per [H-010] lean-scope direction: M2 (reviewer re-read-to-EOF) / hook-gate / ticket-auth-trail → routed to MON-005.
+- OUT OF SCOPE per issue #28 body (c) framing: non-Claude-side reaction protocols (Codex-Builder, etc.) → routed to MON-006.
+
+- Prior-ticket scope (for reference, not this slice):
 - Ticket #: 27 (MON-003)
 - Files:
   - `BUILDER.md` — new §Start Monitor at session entry (MON-003) between §v2 message format and §Structured self-correction format. Canonical builder-side prompt pattern: `tail -F multicheck/agentchat.md | grep -E --line-buffered '^### \[[RH]-[0-9]+\]|^**Verdict:** (PASS|FAIL|ESCALATE)$'` + `persistent: true` + role-appropriate reaction on PASS/FAIL/ESCALATE/monitor-dead.

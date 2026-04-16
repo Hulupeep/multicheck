@@ -37,6 +37,33 @@ install-monitors.sh. See REVIEWER.md §Pairing flip handling.
 -->
 pairing:
 
+## Fail counters (MON-004 Claude-as-Builder reaction state)
+
+<!--
+Per-Task-id FAIL counter consumed by MON-004 Claude-Builder reaction protocol.
+The counter increments by 1 on each **Verdict:** FAIL for the corresponding
+Task-id; caps at 3; on the 3rd FAIL, Claude-Builder auto-writes
+**Verdict:** ESCALATE with **Reviewer:** claude-builder-auto +
+**Reason:** max-fail-cycles-reached (INV-MON-004-002 / MON-004-003).
+
+Keys are **Task-id:** values verbatim. Quote keys that begin with `#` or
+contain special YAML characters. Values are non-negative integers.
+Counter resets to 0 implicitly when a new Task-id appears; operator may
+reset manually by editing a value to 0.
+
+This key lives in details.md (not agentchat.md) because:
+- agentchat.md is append-only; mutable counter state can't live there.
+- details.md is already session-mutable (pairing: from MON-001,
+  In-scope files: per ticket).
+- Operator can inspect with `grep fail_counters: multicheck/details.md`.
+
+Only applies when Claude is the declared builder role (pairings
+`claude-builder+*`). On non-Claude builder pairings (default
+`codex-builder+claude-reviewer`), the reaction protocol is manual per
+MON-006 and this key is unused / empty.
+-->
+fail_counters:
+
 ## Repo
 - URL:
 - Branch:

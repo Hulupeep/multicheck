@@ -662,6 +662,95 @@ Polling (`/loop`, scheduled checks) burns tokens on every probe whether or not t
 
 ---
 
+## Claude-as-Builder Monitor reactions (MON-004)
+
+When Claude is the builder and Monitor is running (per §Start Monitor at session entry above), each reviewer verdict delivered via `<task-notification>` triggers an autonomous turn. This section defines how Claude-Builder reacts to each verdict value.
+
+### PASS verdict
+
+When the reviewer posts `**Verdict:** PASS` (v2) or `[R-NNN] DECISION: accept` (v1):
+
+1. Confirm the current submission is committed. If not, run the authorized commit packet (see §Irreversible actions if a `STATE: irreversible-request` block was part of the submission — see "PASS + irreversible gate" below).
+2. Post `[S-NNN] STATE: verdict-accepted` with the commit SHA.
+3. Stop. Wait for the operator to direct the next ticket.
+
+**Never self-issue PASS.** PASS is a reviewer-produced value that the builder acts on; the builder never writes its own `**Verdict:** PASS`. Invariant per INV-MON-004-003.
+
+**PASS + irreversible gate (v0.5.1 preservation).** If the submission includes a `STATE: irreversible-request` block, the PASS verdict does NOT authorize the irreversible action. Post `[S-NNN] STATE: awaiting-human` and wait for a `[H-NNN]` explicit authorization. Reviewer accept is insufficient for irreversible actions; only a human operator can authorize.
+
+### FAIL verdict
+
+When the reviewer posts `**Verdict:** FAIL` (v2) or `[R-NNN] DECISION: reject` with findings (v1):
+
+1. Read the `**Required fixes:**` checkbox list (MON-002).
+2. Apply each fix.
+3. Post `### BUILDER RESUBMISSION` with the same `**Task-id:**` as the original submission, a `**Required fixes addressed:**` checklist mirroring the reviewer's items, and a fresh `**Tests run:**` count.
+4. Increment `fail_counters.<Task-id>` in `multicheck/details.md` by 1.
+5. Wait for the next verdict.
+
+**Empty fixes list.** If the FAIL verdict has no `**Required fixes:**` section or the checkbox list is empty, post `[S-NNN] STATE: malformed-verdict` asking the reviewer to re-verdict with a concrete fix list. Do NOT resubmit speculatively; you'll burn a FAIL counter cycle without known-good direction.
+
+**Unrecognized task-id.** If the verdict's `**Task-id:**` does not match any prior submission, post `[S-NNN] STATE: verdict-unrecognized` and take no other action. Wait for the reviewer or operator to resolve.
+
+### ESCALATE verdict (reviewer-written)
+
+When the reviewer posts `**Verdict:** ESCALATE` with `**Reviewer:**` = (their model id, NOT `claude-builder-auto`):
+
+1. Post `[S-NNN] STATE: awaiting-human`.
+2. Stop. Do nothing until the operator posts `[H-NNN]` with direction.
+
+### 3-FAIL auto-ESCALATE
+
+FAIL counter is capped at 3 per `**Task-id:**`. On receipt of a 3rd FAIL for the same task:
+
+1. Do NOT apply fixes or resubmit.
+2. Auto-write to `multicheck/agentchat.md`:
+   ```
+   ### REVIEW
+   **Task-id:** <same>
+   **Timestamp:** <ISO-8601 UTC>
+   **Reviewer:** claude-builder-auto
+   **Verdict:** ESCALATE
+   **Findings:**
+   - 3rd consecutive FAIL for Task-id <X>; max-fail-cycles hit.
+   **Reason:** max-fail-cycles-reached
+   ```
+   The `**Reviewer:** claude-builder-auto` marker distinguishes this from reviewer-written ESCALATE (INV-MON-004-002).
+3. Alert the operator via `notify-send` (Linux) with fallback to terminal bell (`printf '\a'`) + a loud line in the ESCALATE entry. Canonical fallback: terminal bell (portable across Linux + macOS + WSL). OS-specific upgrades (macOS `osascript -e 'display notification'`; Windows toast) are available but not implemented in v1.
+4. Post `[S-NNN] STATE: awaiting-human` and stop.
+
+**FAIL counter reset.** When a new `**Task-id:**` appears in any submission, the counter for that new task-id starts at 0. The counter is per-task, not global.
+
+### fail_counters schema in details.md
+
+The counter lives in `multicheck/details.md` (not Claude session memory) so it survives session restart + is operator-inspectable. Schema:
+
+```yaml
+fail_counters:
+  T-432: 2
+  "#128": 0
+  ...
+```
+
+Keys are `**Task-id:**` values verbatim (with quoting if the task-id starts with `#` or contains special yaml characters). Values are non-negative integers. Operator can reset a counter manually by editing details.md.
+
+### Which STATE values apply
+
+Extending the v1 STATE vocabulary per MON-004 scope (see `templates/agentchat.md` STATE block):
+
+- `verdict-accepted` — builder reacted to a reviewer PASS (or v1 accept) and committed/stopped.
+- `awaiting-human` — builder reacted to ESCALATE or irreversible-gate or malformed cases; needs `[H-NNN]` direction.
+- `malformed-verdict` — reviewer's verdict was unusable (empty fixes, missing fields).
+- `verdict-unrecognized` — verdict referenced an unknown task-id.
+
+### Cross-pairing caveat
+
+This protocol is scoped to Claude-Builder-side reactions. On asymmetric pairings (`codex-builder+claude-reviewer` default) where Codex is the builder, this reaction protocol does not apply — Codex has no Monitor tool and the autonomous loop doesn't close on the Codex side. MON-006 documents non-Claude-side manual-relay coverage.
+
+Under `claude-builder+claude-reviewer` (same-provider), both sides of the loop are autonomous per this section + REVIEWER.md §Claude-as-Reviewer reactions (MON-005). Full hands-off FAIL/resubmit cycles are then possible for up to 3 iterations before auto-ESCALATE alerts the operator.
+
+---
+
 ## Structured self-correction format (M4)
 
 Every `STATE: self-correction` entry (v1) or self-correction section (v2) MUST include three structured fields:
