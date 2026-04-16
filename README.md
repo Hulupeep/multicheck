@@ -514,6 +514,18 @@ See the template file header for full documentation.
 
 ---
 
+## Monitor-driven coordination (v2.0)
+
+Each Claude session in your pairing invokes the built-in Claude Code Monitor tool at session entry to watch `multicheck/agentchat.md` for reviewer/HITL events (builder side) or builder submissions/HITL events (reviewer side). Monitor is an event-driven tool — when a matching line appends to the file, Monitor feeds it to the Claude session as an in-conversation notification. The session wakes and reacts automatically. No `check chat` routing needed on the Claude side.
+
+See `BUILDER.md` §Start Monitor at session entry and `REVIEWER.md` §Start Monitor at session entry for the canonical invocation commands per role. The operator asks each Claude session once at session entry: "Start your Monitor per §Start Monitor." Session invokes the tool, confirms, and the remainder of the session runs Monitor-driven.
+
+Non-Claude sides (Codex, Gemini, etc.) keep the manual `check chat` relay pattern — Monitor is a Claude Code feature, not a cross-agent runtime. For the default `codex-builder+claude-reviewer` pairing, this means only the reviewer side auto-wakes; builder still uses manual relay. For `claude-builder+claude-reviewer` (same-provider pairing), both sides auto-wake.
+
+Event-driven vs polling: `/loop`, scheduled checks, and cron-style polling burn tokens on every probe whether or not there's anything to act on. Monitor blocks on the matching event, so the session pays only when something real happens. For a multicheck session with irregular cadence, this is materially cheaper and more responsive.
+
+---
+
 ## Reporting back
 
 After each session, the reviewer writes a metrics report to `multicheck/sessions/<UTC>.md` in your target project. If you find frictions worth reporting upstream, open an issue on this repo with the contents of that report.

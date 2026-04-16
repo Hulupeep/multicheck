@@ -622,6 +622,46 @@ v1 `[S-NNN]` / `[R-NNN]` entries MUST NOT match the v2 Monitor grep pattern `^\*
 
 ---
 
+## Start Monitor at session entry (MON-003)
+
+When your session runs under Claude Code and the pairing declares your side as Claude, invoke the built-in Monitor tool at session entry so reviewer + human entries wake you automatically without the operator having to route them manually. The Monitor tool is documented at https://code.claude.com/docs/en/tools-reference#monitor-tool.
+
+### Canonical builder-side invocation
+
+Use the monitor tool on this command:
+
+```
+tail -F multicheck/agentchat.md | grep -E --line-buffered '^### \[[RH]-[0-9]+\]|^\*\*Verdict:\*\* (PASS|FAIL|ESCALATE)$'
+```
+
+Set `persistent: true` and `description: "Reviewer/HITL posts to multicheck/agentchat.md"`. Wake me only when a matching line emits.
+
+The grep pattern catches:
+
+- `### [R-NNN] ...` — any v1 reviewer entry
+- `### [H-NNN] ...` — any v1 human operator entry (authorization, override, scope change)
+- `**Verdict:** PASS|FAIL|ESCALATE` alone on a line — any v2 verdict line
+
+It deliberately does NOT match your own `### [S-NNN]` or `### [G-NNN]` headings (no self-wake) nor prose mentions of the verdict pattern (the `$` anchor requires the line to end with one of PASS/FAIL/ESCALATE, not the full pipe-separated doc string).
+
+### Reaction on each match
+
+- **`**Verdict:** PASS`** — proceed to commit packet per ticket's DoD.
+- **`**Verdict:** FAIL`** — parse the `**Required fixes:**` checkbox list; address each fix; post a `### BUILDER RESUBMISSION` section referencing the same `**Task-id:**`.
+- **`**Verdict:** ESCALATE`** — post an `[S-NNN]` acknowledging + await operator direction via `[H-NNN]`.
+- **`### [R-NNN]`** (v1) — read the entry for `DECISION` and any `FINDINGS`; react per the verdict.
+- **`### [H-NNN]`** — read authorization scope; apply or halt as directed.
+
+### Mid-session Monitor termination
+
+If the Monitor process terminates mid-session (cancellation, runtime error, session restart), post an entry with `STATE: monitor-dead` explaining the detected absence, then fall back to v1 manual `check chat` relay for the remainder of the session. The operator may re-issue the canonical invocation to restart Monitor.
+
+### Why event-driven, not polling
+
+Polling (`/loop`, scheduled checks) burns tokens on every probe whether or not there's anything to react to. Monitor waits for a meaningful event from the background process. For long-running multicheck sessions with irregular reviewer/HITL cadence, event-driven is materially cheaper and more responsive.
+
+---
+
 ## Structured self-correction format (M4)
 
 Every `STATE: self-correction` entry (v1) or self-correction section (v2) MUST include three structured fields:

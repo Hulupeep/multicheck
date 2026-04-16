@@ -255,6 +255,44 @@ Same semantics as builder-side — see `BUILDER.md §Structured self-correction 
 
 ---
 
+## Start Monitor at session entry (MON-003)
+
+When your session runs under Claude Code and the pairing declares your side as Claude, invoke the built-in Monitor tool at session entry so builder submissions + human entries wake you automatically without the operator having to route them manually. The Monitor tool is documented at https://code.claude.com/docs/en/tools-reference#monitor-tool.
+
+### Canonical reviewer-side invocation
+
+Use the monitor tool on this command:
+
+```
+tail -F multicheck/agentchat.md | grep -E --line-buffered '^### \[[SH]-[0-9]+\]|^### BUILDER SUBMISSION$|^### BUILDER RESUBMISSION$'
+```
+
+Set `persistent: true` and `description: "Builder submissions + HITL posts to multicheck/agentchat.md"`. Wake me only when a matching line emits.
+
+The grep pattern catches:
+
+- `### [S-NNN] ...` — any v1 builder entry
+- `### [H-NNN] ...` — any v1 human operator entry
+- `### BUILDER SUBMISSION` / `### BUILDER RESUBMISSION` (on their own line) — any v2 builder section heading
+
+It deliberately does NOT match your own `### [R-NNN]` or prose references to submission headings inside backticks.
+
+### Reaction on each match
+
+- **`### [S-NNN]`** — read the entry's `STATE`, `CLAIM`, `PROOF`, and `ASK`. If `STATE: ready-for-review`, run the 7-step verification per §Verification order below. If `STATE: scope-expansion`, verify the new file list against `details.md`. If `STATE: self-correction`, accept positively.
+- **`### BUILDER SUBMISSION`** / **`### BUILDER RESUBMISSION`** (v2) — read the section's Task-id + Files changed + Tests run + Implementation notes. Run the 7-step verification. Post a `### REVIEW` section with `**Verdict:** PASS|FAIL|ESCALATE` + `**Findings:**`; include `**Required fixes:**` on FAIL or `**Reason:**` on ESCALATE per MON-002.
+- **`### [H-NNN]`** — read authorization scope; apply or note as context.
+
+### Pre-post discipline
+
+Before appending your verdict via heredoc, run the `wc -l` + `tail -N` from your last-read offset. The Monitor delivers events per line but you may have drafted your verdict over several minutes during which a concurrent `[S-NNN]` or `[H-NNN]` may have landed. Re-read-to-EOF prevents the stale-on-landing failure mode cited in `[R-001]` / `[R-018]` (both caught after post, as procedural self-corrections). M2 discipline — see MON-005 when it lands.
+
+### Mid-session Monitor termination
+
+If the Monitor process terminates mid-session, post an `[R-NNN]` with `STATE: monitor-dead` noting the detected absence, then fall back to v1 manual `check chat` relay for the remainder of the session.
+
+---
+
 ## Hard rules
 
 ### Pre-flight baseline check is mandatory.

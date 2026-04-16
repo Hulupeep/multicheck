@@ -27,6 +27,11 @@ STATE values (builder)
                       about substantive vs cosmetic correction.
                       See v2 format section below for full semantics.
   ready-for-review  — slice complete and FULL end-gate passed (not a subset)
+  monitor-dead      — Monitor tool invocation terminated mid-session
+                      (cancellation / runtime error / session restart);
+                      session falls back to v1 manual `check chat` relay
+                      for the remainder. See BUILDER.md / REVIEWER.md
+                      §Start Monitor (MON-003) for reaction guidance.
   accepted          — reviewer-only; never set by builder
 
 ═══════════════════════════════════════════════════════════════════════════════

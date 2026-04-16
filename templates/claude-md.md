@@ -42,6 +42,8 @@
 
 5. **You cannot autonomously poll.** When the builder posts `STATE: ready-for-review` or `STATE: bypass-request` while the operator is away, you will not see it until the operator types something to wake you. State this in your first reviewer entry. Ask the operator to type "check chat" when the builder posts.
 
+5a. **Invoke Monitor at session entry (Claude Code only).** When running under Claude Code v2.1.98+, invoke the built-in Monitor tool once at session entry with the canonical reviewer-side pattern documented in `REVIEWER.md` §Start Monitor at session entry (MON-003). Monitor tails `multicheck/agentchat.md` for builder/HITL events and wakes you automatically on matches — replacing the manual `check chat` relay for the Claude side. If Monitor invocation fails or terminates mid-session, post `STATE: monitor-dead` and fall back to rule 5's manual-relay pattern for the rest of the session.
+
 6. **Goal alignment is a first-class concern.** The most recent `[G-NNN]` defines what work is in scope. Reject any builder claim that does not clearly advance the active `CURRENT_GOAL` or that addresses a `NON_GOAL`. Goal divergence is a valid `DECISION: reject` ground even when the code is technically correct.
 
 7. **Process violations are first-class findings** — flag `--no-verify`, `--force`, deleted lockfiles, manual schema edits skipping migrations, scope expansion after commit, summarized hook output, anti-vocabulary (`looks good`, `should work`, `pragmatic fix`, `we can just bypass`, `let's downgrade for now`, `fixed locally`), and substantive builder changes without tagged `[S-NNN]` entries. The dominant catch type in real sessions is process, not code defects — that's the feature, not a bug.

@@ -59,18 +59,21 @@ the protocol on its own development.
 ## In-scope files (per current ticket)
 <!--
 Updated by the builder at the start of each ticket, before any edits.
-Current ticket: #26 MON-002 (agentchat.md v2 message format + Verdict grep line).
-Authorized by [R-012] DECISION: accept on combined [S-008]+[S-009]+[S-011]+[S-012] pre-flight at HEAD 8ee2b15.
-Prior ticket #25 MON-001 shipped at commit 8ee2b15; closure packet at [R-008].
+Current ticket: #27 MON-003 (Claude-side Monitor documentation — prompt-pattern based, narrowed per operator 14:12 UTC to Claude Code runtime only).
+Authorized by [R-020] DECISION: accept on combined [S-018]+[S-019]+[S-020] pre-flight at HEAD 612a0d9 against twice-edited issue #27 body (14:12 reversal + 14:19 narrow).
+Prior tickets: #25 MON-001 at 8ee2b15; #26 MON-002 at b0eda73; The_8_Layers.md at 612a0d9 (per [H-006]).
 -->
-- Ticket #: 26 (MON-002)
+- Ticket #: 27 (MON-003)
 - Files:
-  - `templates/agentchat.md` — (a) delete `accept-with-stipulations` DECISION line (F-R001-05); (b) delete `Two-axis verdicts: TECHNICAL and PROCESS are independent.` line (F-R011-01); (c) delete `TECHNICAL: accept | reject` + `PROCESS: accept | reject` from v1 [R-NNN] format block (F-R011-01); (d) append v2 section documenting ### BUILDER SUBMISSION / ### BUILDER RESUBMISSION / ### REVIEW heading vocab + **Verdict:** PASS/FAIL/ESCALATE regex + **Required fixes:** + **Reason:** + **Task-id:** formats + structured self-correction format (PRIOR POSITION / NEW POSITION / SCOPE LABEL) per M4.
-  - `BUILDER.md` — (a) rewrite line 495 to binary-verdict framing (F-R001-05); (b) new subsection documenting v2 SUBMISSION/RESUBMISSION format + structured self-correction format.
-  - `REVIEWER.md` — (a) rewrite line 208 to "Reject with a FINDING" (F-R001-05); (b) rewrite line 362 to `reject`-only (F-R001-05); (c) new subsection documenting v2 verdict vocab + FAIL/ESCALATE section formats + reviewer-side self-correction format.
-  - `README.md` — (a) rewrite line 294 to binary `DECISION: accept | reject | needs-more-proof` + retire two-axis framing (F-R001-05 + F-R011-01); (b) rewrite line 367 bullet to "Reviewer rejects with a FINDING" (F-R001-05).
-  - `examples/agentchat-v2-samples.md` — NEW file with positive fixtures (SUBMISSION / REVIEW w/ PASS, FAIL, ESCALATE / RESUBMISSION / self-correction w/ M4 fields) + negative fixture (v1 [R-NNN] entry that MUST NOT match v2 Monitor grep).
-  - `tests/contracts/mon-002.test.js` — promote 9 test.todo → test() per [S-008] Q5 disposition matrix; 3 deferrals (MON-001-002 precedent — INV-MON-002-001 process-enforced cites hooks/pre-push.sh; INV-MON-002-002 covered-by cites templates/agentchat.md §File invariants; no ticket for either per [R-010] accept); add 2 structural tests (F-R010-02 accept-with-stipulations count-based + F-R011-01 two-axis residue regex).
+  - `BUILDER.md` — new §Start Monitor at session entry (MON-003) between §v2 message format and §Structured self-correction format. Canonical builder-side prompt pattern: `tail -F multicheck/agentchat.md | grep -E --line-buffered '^### \[[RH]-[0-9]+\]|^**Verdict:** (PASS|FAIL|ESCALATE)$'` + `persistent: true` + role-appropriate reaction on PASS/FAIL/ESCALATE/monitor-dead.
+  - `REVIEWER.md` — new §Start Monitor at session entry (MON-003). Canonical reviewer-side prompt pattern: `tail -F multicheck/agentchat.md | grep -E --line-buffered '^### \[[SH]-[0-9]+\]|^### BUILDER SUBMISSION$|^### BUILDER RESUBMISSION$'` + `persistent: true` + reaction (read latest submission + run 7-step verification).
+  - `README.md` — new §Monitor-driven coordination (v2.0) user-facing paragraph; links to BUILDER.md / REVIEWER.md §Start Monitor.
+  - `templates/agentchat.md` — extend STATE vocabulary block with `monitor-dead` (Monitor was active but terminated mid-session — cancel / restart / runtime error; session posts this STATE + falls back to v1 `check chat` relay).
+  - `templates/claude-md.md` — add one-line session-entry hint pointing at BUILDER.md / REVIEWER.md §Start Monitor (so auto-loaded anchor surfaces the protocol).
+  - `templates/agents-md.md` — same session-entry hint.
+  - `tests/contracts/mon-003.test.js` — promote 7 test.todo → test() per [S-020] disposition (rows 1, 2, 7, 8, 9, 11, 13: canonical prompt presence in BUILDER.md + REVIEWER.md; `monitor-dead` STATE in templates/agentchat.md + reaction docs; Monitor-inside-session-runtime vocabulary; read-only command pipeline; §Start Monitor section + role-specific grep pattern; `monitor-dead` reaction guidance). 6 DEFER with deferral comments (rows 3, 4, 5, 6: WITHDRAWN under [S-017]/narrow; row 10: cross-ref to MON-001/007; row 12: collapsed under narrow).
+  - `tests/e2e/mon-003.test.js` — all 7 e2e test.todos DEFER with "no installer under prompt-pattern scope; Monitor invocation is agent-runtime-side; e2e requires session runtime, out of repo test scope" rationale.
+- OUT OF SCOPE (per F-R018-03 operator narrow 14:12 UTC): Bedrock / Vertex AI / Foundry compatibility docs, `DISABLE_TELEMETRY` / `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` handling, `monitor-unavailable` STATE, version-requirement prose (v2.1.98+), fallback-on-unavailability docs.
 
 ## End-gate command
 <!-- Full jest run across all contract + e2e stubs. -->
