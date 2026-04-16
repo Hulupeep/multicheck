@@ -108,6 +108,25 @@ Before posting anything, set up the working folder:
    - Database connection or query path
    - **End-gate command** — the EXACT command the pre-commit hook runs, not a subset
    - **In-scope files** for the first ticket — the file list you intend to touch
+   - **Pairing** — see the pairing prompt immediately below
+
+   As part of the real-values fill, ask your operator which builder/reviewer pairing is active for this session. Present the three accepted values in the canonical order below and write the chosen value as the `pairing:` line in `multicheck/details.md`. Fail closed: if the operator answers with anything other than 1, 2, or 3, re-prompt — do not accept free-text values.
+
+   ```
+   Pairing? Enter 1, 2, or 3:
+     (1) codex-builder+claude-reviewer   — default. Codex in Terminal A (builder),
+                                           Claude in Terminal B (reviewer).
+                                           Preserves asymmetric-blind-spots value.
+     (2) claude-builder+codex-reviewer   — flipped. Claude builds, Codex reviews.
+                                           Preserves asymmetric-blind-spots value.
+     (3) claude-builder+claude-reviewer  — same-provider. Two Claude sessions.
+                                           Loses ~80% of asymmetric-blind-spots
+                                           value per README §Why it works.
+   ```
+
+   The closed enum is authoritative. New pairings (e.g., involving Gemini) are a protocol amendment, not a config tweak — open an issue before introducing them.
+
+   **Pairing flip mid-session**: if the operator declares `STATE: pairing-flip`, post a new `[G-NNN]` goal packet before any other work. Update the `pairing:` line in `multicheck/details.md` to the new enum value, re-run Phase 0 step 5 (anchor refresh via `refresh_anchor`), and re-run `install-monitors.sh` to install/uninstall Monitor config based on the new pairing. See REVIEWER.md §Pairing flip handling for the reviewer's verification steps.
 
    The reviewer uses `details.md` as the source of truth for what it can verify. Inaccurate details = unverifiable session.
 

@@ -378,6 +378,20 @@ As of 2026-04: **Codex is currently the stronger builder; Claude is the stronger
 
 This pairing rotates with each model release. Re-evaluate when a new version of either ships. The single most important thing is that **the two terminals are running different LLMs**. Same-model setups lose ~80% of the protocol's value because the asymmetric blind spots disappear.
 
+### Pairing options (v2.0, closed enum)
+
+From v2.0 forward, the pairing is a first-class protocol value declared once per session in `multicheck/details.md` under the `pairing:` key. Three accepted values:
+
+- **`codex-builder+claude-reviewer`** — default. Codex in Terminal A, Claude in Terminal B. Preserves the asymmetric-blind-spots value that makes the protocol work.
+- **`claude-builder+codex-reviewer`** — flipped. Claude builds, Codex reviews. Preserves asymmetric value; useful when Claude is the stronger coder for your domain.
+- **`claude-builder+claude-reviewer`** — same-provider. Two Claude sessions. Loses ~80% of the asymmetric-blind-spots value per §Why it works. Provided for operators who can't run a non-Claude second terminal.
+
+Operators declare the pairing during Phase 0 setup (see `BUILDER.md` §Phase 0 step 6). `install-monitors.sh` reads this key and installs Claude-side Monitor config only on the Claude terminal(s); the non-Claude terminal keeps v1 manual relay.
+
+**Pairing flip mid-session:** post `STATE: pairing-flip`, post a new `[G-NNN]` goal packet declaring the change, update the `pairing:` line in `multicheck/details.md`, re-run Phase 0 step 5 (anchor refresh) and `install-monitors.sh`. The reviewer verifies the flip per `REVIEWER.md` §Pairing flip handling.
+
+The closed enum is authoritative. New pairings (e.g., Gemini) are protocol amendments, not config tweaks — open an issue first.
+
 ---
 
 ## What you get in your target project after first run

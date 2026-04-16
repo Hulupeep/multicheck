@@ -16,6 +16,27 @@ chat path, active goal, any session-specific overrides. The builder updates it
 as the session evolves.
 -->
 
+## Pairing
+
+<!--
+Closed enum — three accepted values. Set once per session during Phase 0.
+Operator declares via BUILDER.md Phase 0 step 6 prompt; the chosen value is
+written here. install-monitors.sh reads this key and installs Claude-side
+Monitor config only on the Claude terminal(s). Absent or invalid value → the
+installer fails closed.
+
+Three accepted values (closed enum):
+
+- codex-builder+claude-reviewer   ← default per README v0.5.3 §Current provider pairing recommendation
+- claude-builder+codex-reviewer   ← flipped; preserves asymmetric blind-spots
+- claude-builder+claude-reviewer  ← same-provider; loses ~80% of asymmetric-blind-spots value per README §Why it works
+
+Pairing flip mid-session: post `STATE: pairing-flip`, post a new [G-NNN] goal
+packet, update this line, re-run Phase 0 step 5 (anchor refresh), re-run
+install-monitors.sh. See REVIEWER.md §Pairing flip handling.
+-->
+pairing:
+
 ## Repo
 - URL:
 - Branch:

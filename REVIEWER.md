@@ -423,6 +423,29 @@ Re-run your Phase 0 baseline health check on the new HEAD if the codebase has ma
 
 ---
 
+## Pairing flip handling
+
+The `pairing:` key in `multicheck/details.md` is set once per session during Phase 0. If the operator flips the pairing mid-session — e.g., from `codex-builder+claude-reviewer` to `claude-builder+claude-reviewer` because Codex is unavailable — a new `[G-NNN]` goal packet is required to re-anchor the protocol. Accepting work under an implicit pairing change is a process violation.
+
+**Expected builder flow on a pairing flip (reject if any step is missing):**
+
+1. Operator posts `STATE: pairing-flip` declaring the intent.
+2. Builder posts a **new `[G-NNN]` goal packet** that either names the new pairing in `CURRENT_GOAL` / `NON_GOALS` or explicitly acknowledges the change under same-session goals. Accepting work under the old `[G-NNN]` after a pairing flip is goal-divergence.
+3. Builder updates the `pairing:` line in `multicheck/details.md` to the new enum value.
+4. Operator re-runs Phase 0 step 5 (anchor refresh via `refresh_anchor`) so the anchor templates reflect the new role split.
+5. Operator re-runs `install-monitors.sh` to install/uninstall Monitor config on the appropriate terminal(s).
+
+**What the reviewer verifies:**
+
+- The new `[G-NNN]` exists and predates the first `[S-NNN]` under the new pairing. If the builder posts `STATE: building` after a pairing flip without a new `[G-NNN]`, reject on goal-divergence grounds.
+- The `pairing:` line in `multicheck/details.md` matches the pairing declared in the new `[G-NNN]`. Stale values are a process violation even when the work is technically clean.
+- Anchor templates in `CLAUDE.md` / `AGENTS.md` were re-refreshed after the flip. A fresh session entering the repo must see a consistent role split; stale anchors after a flip are a hard rejection.
+- If the new pairing is `claude-builder+claude-reviewer` (same-provider), state the ~80% asymmetric-blind-spots value loss in your next `[R-NNN]` per README §Why it works. Operator must have explicitly accepted this in the new `[G-NNN]` or a fresh `[H-NNN]`.
+
+The closed enum (three values) is authoritative. A `pairing:` value outside the enum is a process violation regardless of technical state.
+
+---
+
 ## Verification order
 
 For every builder claim, work through this order. Stop at the first failure and post a `reject` or `needs-more-proof`.
