@@ -165,6 +165,96 @@ Numbering: reviewer entries are `R-001`, `R-002`, ... in strict sequence.
 
 ---
 
+## v2 verdict format (MON-002)
+
+v2 introduces a Monitor-greppable verdict line that coexists with the v1 `[R-NNN]` tagged format documented above. The Claude-side Monitor (MON-003) greps for this exact pattern to wake Claude-Builder on verdict events without manual `check chat` relay.
+
+### The verdict line (REQ MON-002-002)
+
+Every v2 `### REVIEW` section MUST contain exactly one line matching the canonical grep pattern:
+
+```
+^\*\*Verdict:\*\* (PASS|FAIL|ESCALATE)$
+```
+
+Rules:
+
+- Line-anchored (`^` / `$`) — no leading whitespace, no trailing text on the line.
+- Case-sensitive — `PASS`, `FAIL`, `ESCALATE` only. Not `pass` / `Pass` / `Passed`.
+- Exactly one per `### REVIEW` section (INV-MON-002-003).
+
+The v2 enum is **binary-plus-escalate**. `PASS` and `FAIL` are the verdicts; `ESCALATE` requests human intervention. There is no v2 equivalent of `needs-more-proof` — if proof is incomplete, the verdict is `FAIL` with a `**Required fixes:**` list stating what proof is missing.
+
+### FAIL format (REQ MON-002-004)
+
+```
+### REVIEW
+**Task-id:** #<issue>
+**Timestamp:** <ISO-8601 UTC>
+**Reviewer:** <model-id>
+**Verdict:** FAIL
+**Findings:**
+- <finding 1>
+- <finding 2>
+**Required fixes:**
+- [ ] <actionable fix 1>
+- [ ] <actionable fix 2>
+```
+
+`**Required fixes:**` is a GFM checkbox list. Claude-Builder reads this list directly on FAIL wake (MON-004) and addresses each item in a `### BUILDER RESUBMISSION` referencing the same `Task-id:`.
+
+### ESCALATE format (REQ MON-002-005)
+
+```
+### REVIEW
+**Task-id:** #<issue>
+**Timestamp:** <ISO-8601 UTC>
+**Reviewer:** <model-id>
+**Verdict:** ESCALATE
+**Findings:**
+- <finding>
+**Reason:**
+<narrative stating why human intervention is required — e.g., irreversible
+action awaiting [H-NNN], protocol ambiguity the reviewer cannot resolve,
+3rd consecutive FAIL on the same Task-id per MON-004 auto-ESCALATE>
+```
+
+`**Reason:**` is free-form narrative, not an enum. It must be substantive — "ESCALATE because I'm stuck" is insufficient.
+
+### PASS format
+
+```
+### REVIEW
+**Task-id:** #<issue>
+**Timestamp:** <ISO-8601 UTC>
+**Reviewer:** <model-id>
+**Verdict:** PASS
+**Findings:**
+- <verified with evidence>
+```
+
+No `**Required fixes:**` or `**Reason:**` on PASS. Findings block still mandatory — state what you verified.
+
+### Backward-compat (REQ MON-002-003)
+
+v1 `[R-NNN]` tagged entries MUST NOT match the v2 Monitor grep `^\*\*Verdict:\*\*`. The `DECISION:` field in v1 format uses the v1 vocabulary (`accept` / `reject` / `needs-more-proof` / `active-review`); v2 uses `**Verdict:**` with the PASS/FAIL/ESCALATE enum. Both are canonical.
+
+One task uses one vocabulary throughout — mixing within a task is a process violation the reviewer flags on next verdict.
+
+### Reviewer-side self-correction (M4)
+
+Any reviewer entry with the self-correction intent (v1 `### [R-NNN]` with self-correction framing, or v2 `### REVIEW` with a self-correction section) MUST include:
+
+```
+PRIOR POSITION: <what I previously verdict-ed or claimed>
+NEW POSITION:   <what I now claim>
+SCOPE LABEL:    REVERSED | REWORDED-ONLY | SCOPE-NARROWED | SCOPE-EXPANDED
+```
+
+Same semantics as builder-side — see `BUILDER.md §Structured self-correction format (M4)` for the full definitions. The canonical example for reviewer-side is `[R-003]` (on 2026-04-16 dogfood session) correcting an arithmetic contradiction in `[R-002]` (SCOPE-NARROWED: the revised MISSING count was a subset of the original, no position reversal).
+
+---
+
 ## Hard rules
 
 ### Pre-flight baseline check is mandatory.
@@ -205,7 +295,7 @@ Even when the technical claim is correct, flag:
 - Reset of shared/published commits
 - Builder making substantive changes without a corresponding tagged `[S-NNN]` entry (the audit trail must come from the builder's own voice, not reconstructed by the reviewer from `git log`)
 
-Use `accept-with-stipulations`. Never silently overlook a process violation just because the code is right.
+Reject with a FINDING. Never silently overlook a process violation just because the code is right. Verdicts are binary — process violations block merge the same way technical bugs do.
 
 ### Goal alignment is a first-class concern.
 
@@ -359,7 +449,7 @@ You wake when your operator types something. The instant you wake:
    - **`STATE: scope-expansion`** — verify the new file list against `details.md`, accept or reject
    - **`STATE: self-correction`** — accept positively and increment your self-correction counter
    - **`STATE: building`** with no claim and no pre-flight Q&A — this is the "silent substantive work" anti-pattern. Reject and require a pre-flight.
-4. If anything is `accept-with-stipulations` or `reject`, also leave a `gh issue comment` with the durable finding and a pointer back to the agentchat entry timestamp.
+4. If the decision is `reject` with one or more FINDINGS, also leave a `gh issue comment` with the durable finding and a pointer back to the agentchat entry timestamp.
 
 ---
 

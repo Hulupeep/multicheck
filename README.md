@@ -291,7 +291,7 @@ The reviewer runs its 7-step verification order from a clean shell:
 
 The reviewer also runs applicable verification recipes (slice purity, diff-content check on cascaded files, wider grep before fix recommendations, cross-layer value consistency).
 
-Posts `[R-NNN]` with two-axis verdict: `TECHNICAL` + `PROCESS` independent. `DECISION: accept | accept-with-stipulations | reject | needs-more-proof`.
+Posts `[R-NNN]` with `DECISION: accept | reject | needs-more-proof`. Verdicts are binary — process violations are FINDINGS that block merge, same as technical bugs; `reject` covers both.
 
 **Phase 6 — Operator tells the builder to open a draft PR**
 
@@ -364,7 +364,7 @@ Total operator input: 5 short pastes, ~3 minutes of attention. Total elapsed tim
 ### When things go sideways
 
 - **Reviewer rejects pre-flight** → paste the reviewer's `MISSING:` field into the builder terminal, builder fixes, re-post, loop.
-- **Reviewer rejects with `accept-with-stipulations`** → the code is fine but a process violation needs acknowledgment. Tell the builder to post a self-correction entry acknowledging the stipulation, then proceed.
+- **Reviewer rejects with a FINDING** → fix the finding (technical or process, both block merge), post a self-correction entry acknowledging the fix, re-submit. Clean verdicts only — no stipulation shortcuts.
 - **Reviewer rejects for goal-divergence** → the work doesn't advance the active `[G-NNN]`. Either the builder re-scopes, or you post a new `[G-NNN]` amending the goal, then the builder re-posts the pre-flight under the new goal.
 - **Builder hits a harness failure (test can't import something)** → the builder runs the harness-failure triage framework (5-step decision tree: existing factory? sibling mock pattern? product-code shape problem? wrong test boundary?) and posts a `HARNESS TRIAGE:` block. Reviewer verifies the triage was actually applied, not just referenced.
 - **Builder wants to use `--no-verify` or `--force`** → builder posts `STATE: bypass-request` with full hook output verbatim. Reviewer decides — if reversible, reviewer can ack; if irreversible, reviewer kicks it to you as `irreversible-request`.

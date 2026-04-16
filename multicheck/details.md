@@ -59,15 +59,18 @@ the protocol on its own development.
 ## In-scope files (per current ticket)
 <!--
 Updated by the builder at the start of each ticket, before any edits.
-Current ticket: #25 MON-001 (Pairing declaration). Authorized by [R-004] DECISION: accept on combined [S-002]+[S-003] pre-flight at HEAD 96e812a.
+Current ticket: #26 MON-002 (agentchat.md v2 message format + Verdict grep line).
+Authorized by [R-012] DECISION: accept on combined [S-008]+[S-009]+[S-011]+[S-012] pre-flight at HEAD 8ee2b15.
+Prior ticket #25 MON-001 shipped at commit 8ee2b15; closure packet at [R-008].
 -->
-- Ticket #: 25 (MON-001)
+- Ticket #: 26 (MON-002)
 - Files:
-  - `templates/details.md` — add `## Pairing` section with `pairing:` placeholder + HTML comment enumerating three enum values + default (MON-001-001, MON-001-003)
-  - `BUILDER.md` — augment Phase 0 step 6 with ordered pairing prompt; brief pairing-flip cross-reference (MON-001-004, J-MON-001-DECLARE, MON-001-005)
-  - `README.md` — informative "Pairing options" section (supports MON-001-005; not normatively tested)
-  - `REVIEWER.md` — add "Pairing flip handling" section (MON-001-005, J-MON-001-FLIP)
-  - `tests/contracts/mon-001.test.js` — promote 7 `test.todo()` → real `test()` assertions per [S-003] disposition; keep 3 with deferral comments naming destination ticket
+  - `templates/agentchat.md` — (a) delete `accept-with-stipulations` DECISION line (F-R001-05); (b) delete `Two-axis verdicts: TECHNICAL and PROCESS are independent.` line (F-R011-01); (c) delete `TECHNICAL: accept | reject` + `PROCESS: accept | reject` from v1 [R-NNN] format block (F-R011-01); (d) append v2 section documenting ### BUILDER SUBMISSION / ### BUILDER RESUBMISSION / ### REVIEW heading vocab + **Verdict:** PASS/FAIL/ESCALATE regex + **Required fixes:** + **Reason:** + **Task-id:** formats + structured self-correction format (PRIOR POSITION / NEW POSITION / SCOPE LABEL) per M4.
+  - `BUILDER.md` — (a) rewrite line 495 to binary-verdict framing (F-R001-05); (b) new subsection documenting v2 SUBMISSION/RESUBMISSION format + structured self-correction format.
+  - `REVIEWER.md` — (a) rewrite line 208 to "Reject with a FINDING" (F-R001-05); (b) rewrite line 362 to `reject`-only (F-R001-05); (c) new subsection documenting v2 verdict vocab + FAIL/ESCALATE section formats + reviewer-side self-correction format.
+  - `README.md` — (a) rewrite line 294 to binary `DECISION: accept | reject | needs-more-proof` + retire two-axis framing (F-R001-05 + F-R011-01); (b) rewrite line 367 bullet to "Reviewer rejects with a FINDING" (F-R001-05).
+  - `examples/agentchat-v2-samples.md` — NEW file with positive fixtures (SUBMISSION / REVIEW w/ PASS, FAIL, ESCALATE / RESUBMISSION / self-correction w/ M4 fields) + negative fixture (v1 [R-NNN] entry that MUST NOT match v2 Monitor grep).
+  - `tests/contracts/mon-002.test.js` — promote 9 test.todo → test() per [S-008] Q5 disposition matrix; 3 deferrals (MON-001-002 precedent — INV-MON-002-001 process-enforced cites hooks/pre-push.sh; INV-MON-002-002 covered-by cites templates/agentchat.md §File invariants; no ticket for either per [R-010] accept); add 2 structural tests (F-R010-02 accept-with-stipulations count-based + F-R011-01 two-axis residue regex).
 
 ## End-gate command
 <!-- Full jest run across all contract + e2e stubs. -->

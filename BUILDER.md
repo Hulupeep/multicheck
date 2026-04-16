@@ -492,7 +492,7 @@ The reviewer wakes when its operator types something. There is no daemon polling
 - If the reviewer rejects with `needs-more-proof`, the response is **more proof**, not more argument. Run the actual command, paste the actual output.
 - If the reviewer rejects on technical grounds and you believe they are wrong, post a self-correction-style entry citing the exact code path that contradicts the rejection. Do not loop.
 - After 2 cycles of disagreement on the same claim, post `STATE: blocked` with `ASK: human-authorization`. Human resolves disputes the protocol cannot.
-- If the reviewer flags `accept-with-stipulations`, the technical claim is accepted but a process violation must be acknowledged in your next entry. State the corrective action.
+- If the reviewer `reject`s with a FINDING (technical or process), acknowledge the finding in your next entry and state the corrective action. Re-submit after fixing. Verdicts are binary — process violations block merge the same way technical bugs do.
 
 ---
 
@@ -561,6 +561,87 @@ Why a single-quoted heredoc:
 - **`Edit` / `Write` tools are a fallback only.** They may race with concurrent writers and they may fail with "file modified since read" errors when something else touched the file. Use heredoc append by default.
 
 In one ~5-hour reference session, ~10 reviewer writes using the heredoc pattern hit zero races. The 3 prior writes using Edit/Write all hit "file modified since read" failures.
+
+---
+
+## v2 message format (MON-002)
+
+v2 introduces structured, Monitor-greppable sections that coexist with the v1 `[S-NNN]`/`[R-NNN]` tagged format documented above. v1 remains valid indefinitely for within-session work. v2 is the format the Claude-side Monitor (MON-003) greps against to wake Claude agents without manual `check chat` relay.
+
+### Heading vocabulary (closed enum)
+
+Three headings, exact strings, on a line by themselves:
+
+- `### BUILDER SUBMISSION`
+- `### BUILDER RESUBMISSION`
+- `### REVIEW`
+
+These are Monitor grep targets. Deviations (`### BUILDER_SUBMISSION`, `### Builder Submission`, trailing text) will not match.
+
+### BUILDER SUBMISSION skeleton
+
+Use when posting completed implementation for review:
+
+```
+### BUILDER SUBMISSION
+**Task-id:** #<gh-issue> or T-<numeric>
+**Timestamp:** <ISO-8601 UTC, e.g. 2026-04-16T12:30:00Z>
+**Files changed:** <comma-separated relative paths>
+**Tests run:** <suites / passed / failed / skipped / todo counts verbatim>
+**Implementation notes:**
+- <bullet — rationale, file:line refs, deferred items>
+- <bullet>
+```
+
+### BUILDER RESUBMISSION skeleton
+
+Use when responding to a `**Verdict:** FAIL` with a fresh round of work:
+
+```
+### BUILDER RESUBMISSION
+**Task-id:** #<same-as-SUBMISSION>
+**Timestamp:** <ISO-8601 UTC>
+**Files changed:** <comma-separated>
+**Tests run:** <counts>
+**Required fixes addressed:**
+- [x] <copy the reviewer's FAIL Required fixes item + note what changed>
+- [x] <next item>
+**Implementation notes:**
+- <bullet>
+```
+
+Reference the prior SUBMISSION's Task-id verbatim so the Monitor correlates the chain.
+
+### 3-FAIL auto-ESCALATE rule (MON-004)
+
+If a Task-id accumulates 3 consecutive `**Verdict:** FAIL` entries without a PASS in between, the next builder entry MUST be a `**Verdict:** ESCALATE` request with a `**Reason:**` section. The 3-FAIL threshold bounds the correction-round budget per task. Manually exceeding it without ESCALATE is a process violation.
+
+### Backward-compat
+
+v1 `[S-NNN]` / `[R-NNN]` entries MUST NOT match the v2 Monitor grep pattern `^\*\*Verdict:\*\*`. One task uses one vocabulary throughout — mixing within a task is a process violation. Sessions with both v1 and v2 tasks are valid; individual tasks are not split across formats.
+
+---
+
+## Structured self-correction format (M4)
+
+Every `STATE: self-correction` entry (v1) or self-correction section (v2) MUST include three structured fields:
+
+```
+PRIOR POSITION: <what I previously claimed, verbatim or paraphrased with cite>
+NEW POSITION:   <what I now claim>
+SCOPE LABEL:    REVERSED | REWORDED-ONLY | SCOPE-NARROWED | SCOPE-EXPANDED
+```
+
+SCOPE LABEL semantics:
+
+- `REVERSED` — new position contradicts prior. Example: claimed "two entries were substantively equivalent" when they took opposite positions. Use this label when you are actually taking back what you said, not just rewording.
+- `REWORDED-ONLY` — same position, different wording. If you reach for this label, consider whether the self-correction adds any signal vs. noise. Reviewers may flag excess REWORDED-ONLY entries as performative.
+- `SCOPE-NARROWED` — new position is a proper subset of prior. Some prior claims retained, others retracted with explanation.
+- `SCOPE-EXPANDED` — new position adds to prior without retracting any. Extends scope or adds newly-discovered material (e.g., reviewer surfaced a scope gap; builder folds it in).
+
+The structure forces honesty about whether the correction is substantive or cosmetic. A self-correction whose PRIOR and NEW positions are semantically identical is a cosmetic rewording, not a real correction — the `REWORDED-ONLY` label makes that visible to the reviewer.
+
+Canonical example of why this format exists: [R-007] (on 2026-04-16 dogfood session) caught `[S-005]` claiming two opposing `[R-006]` entries were "substantively equivalent" when they took REVERSED positions (one argued role-level namespace, the other session-level). Without the structure, the mis-framing slipped through self-correction review.
 
 ---
 
