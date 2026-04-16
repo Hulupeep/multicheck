@@ -10,7 +10,11 @@ When you run a second, different LLM that independently checks the first LLM's w
 
 **How**: two terminals, two different LLMs, one shared chat file. Codex builds. Claude reviews. They talk in a structured format. The reviewer doesn't trust the builder's status updates — it runs the tests itself, hits the URLs itself, queries the DB itself.
 
-**Your job**: monitor adherence, not implementation. You don't write code. You don't write specs (the builder extracts them from the ticket). You don't verify the work (the reviewer does). Your role is the ritual — initiating stories, waking the reviewer at phase boundaries, and authorizing irreversible actions when the protocol escalates them to you. Think of yourself as the conductor making sure the orchestra plays in time, not the composer or any of the musicians. In practice this is ~30 seconds of attention per wake, a few times per story, and a total of 3-5 minutes of your time per slice.
+**Your job**: monitor adherence, not implementation. You don't write code. You don't write specs (the builder extracts them from the ticket). You don't verify the work (the reviewer does). Your role is the ritual — initiating stories, authorizing irreversible actions when the protocol escalates them to you, and making scope decisions. Think of yourself as the conductor making sure the orchestra plays in time, not the composer or any of the musicians.
+
+**If both sides run Claude Code** (`claude-builder+claude-reviewer` pairing), the Claude Code Monitor tool handles the relay automatically. Each Claude session watches `multicheck/agentchat.md` for the other side's posts and wakes on every match — no `check chat` pasting, no operator relay between terminals. The FAIL/resubmit loop runs hands-free for up to 3 iterations before auto-escalating to you. In practice, operator intervention drops to scope decisions + commit authorization + occasional ESCALATE handling. Monitor is not a feature — it's the precondition for running the protocol async. See §Monitor-driven coordination (v2.0) below + `BUILDER.md` / `REVIEWER.md` §Start Monitor at session entry for the canonical invocation commands.
+
+**If one side is a non-Claude model** (default `codex-builder+claude-reviewer`), the Claude side auto-wakes via Monitor but the non-Claude side still needs you to paste `check chat` when the other agent posts. This is ~30 seconds of attention per wake, a few times per story, and a total of 3-5 minutes of your time per slice. See §Monitor-driven coordination (v2.0) for the per-pairing autonomy map.
 
 **What happens automatically in the background**:
 
@@ -335,7 +339,10 @@ The builder marks the PR ready (`gh pr ready`), CI fires, merge lands. The revie
 
 At end of day (or end of feature set), paste the METRICS.md daily-ask prompts into both terminals. Each agent enumerates its catches — self-corrections for the builder, rejections and bonus verifications for the reviewer — and appends rows to `multicheck/metrics.md` via heredoc. The reviewer posts a final `[R-FINAL]` session report that also copies to `multicheck/sessions/<UTC>.md`.
 
-**Total operator effort for one ticket**: roughly 5-6 `check chat` pastes + 1 pre-flight instruction + 1 proceed + 1 draft-PR instruction + 1 PR-review instruction + 0 or 1 irreversible-request authorization. If you need to make a ~30-second decision for each paste, that's about 3-5 minutes of attention for a 1-2 hour slice. The rest is the agents running on their own.
+**Total operator effort for one ticket** depends on the pairing:
+
+- **`claude-builder+claude-reviewer` (both sides auto-wake via Monitor)**: ~2-3 operator interventions per slice — scope decision + commit authorization + occasional ESCALATE. FAIL/resubmit loops run autonomously for up to 3 iterations. Total: roughly 1-2 minutes of attention per 1-2 hour slice. The protocol is mostly automated; you intervene at decision points, not relay points.
+- **Asymmetric pairing (one non-Claude side)**: roughly 5-6 `check chat` pastes into the non-Claude terminal + 1 pre-flight instruction + 1 proceed + 1 draft-PR instruction + 1 PR-review instruction + 0 or 1 irreversible-request authorization. About 3-5 minutes of attention per slice. The Claude side auto-wakes; you relay the non-Claude side.
 
 ### What a short story looks like in practice
 
@@ -386,9 +393,9 @@ From v2.0 forward, the pairing is a first-class protocol value declared once per
 - **`claude-builder+codex-reviewer`** — flipped. Claude builds, Codex reviews. Preserves asymmetric value; useful when Claude is the stronger coder for your domain.
 - **`claude-builder+claude-reviewer`** — same-provider. Two Claude sessions. Loses ~80% of the asymmetric-blind-spots value per §Why it works. Provided for operators who can't run a non-Claude second terminal.
 
-Operators declare the pairing during Phase 0 setup (see `BUILDER.md` §Phase 0 step 6). `install-monitors.sh` reads this key and installs Claude-side Monitor config only on the Claude terminal(s); the non-Claude terminal keeps v1 manual relay.
+Operators declare the pairing during Phase 0 setup (see `BUILDER.md` §Phase 0 step 6). Each Claude-side session then invokes the Monitor tool per `BUILDER.md` / `REVIEWER.md` §Start Monitor at session entry; the non-Claude terminal keeps v1 manual `check chat` relay.
 
-**Pairing flip mid-session:** post `STATE: pairing-flip`, post a new `[G-NNN]` goal packet declaring the change, update the `pairing:` line in `multicheck/details.md`, re-run Phase 0 step 5 (anchor refresh) and `install-monitors.sh`. The reviewer verifies the flip per `REVIEWER.md` §Pairing flip handling.
+**Pairing flip mid-session:** post `STATE: pairing-flip`, post a new `[G-NNN]` goal packet declaring the change, update the `pairing:` line in `multicheck/details.md`, re-run Phase 0 step 5 (anchor refresh), and re-invoke the Monitor tool on each Claude-side terminal with the correct role-specific grep pattern. The reviewer verifies the flip per `REVIEWER.md` §Pairing flip handling.
 
 The closed enum is authoritative. New pairings (e.g., Gemini) are protocol amendments, not config tweaks — open an issue first.
 
